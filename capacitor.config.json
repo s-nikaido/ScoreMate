@@ -1,0 +1,6 @@
+{
+  "appId": "com.nikaidoworks.scoremate",
+  "appName": "ScoreMate",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
