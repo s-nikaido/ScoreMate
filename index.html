@@ -350,7 +350,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.023</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.024</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -384,8 +384,8 @@
 <script>
 // ================== IndexedDBラッパー ==================
 const IDB_NAME = 'scoremate';
-const IDB_VERSION = 2;
-const STORES = ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files', 'meta'];
+const IDB_VERSION = 3;
+const STORES = ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files', 'meta', 'tombstones'];
 let idb;
 
 function openIdb() {
@@ -427,6 +427,11 @@ function findWorkByTitle(title) {
   return db.works.find(w => w.title.trim() === norm) || null;
 }
 
+async function recordTombstone(table, recordId) {
+  const key = `${table}:${recordId}`;
+  await idbPut('tombstones', { id: key, table, recordId, deletedAt: nowIso() });
+}
+
 function makeSimpleMaster(table) {
   return {
     table,
@@ -453,6 +458,7 @@ function makeSimpleMaster(table) {
     async remove(id) {
       await idbDelete(table, id);
       db[table] = db[table].filter(x => x.id !== id);
+      await recordTombstone(table, id);
     },
   };
 }
@@ -510,12 +516,17 @@ async function deleteScore(scoreId) {
   await idbDelete('scores', scoreId);
   if (score.image_file_id) await deleteImageFile(score.image_file_id);
   db.scores = db.scores.filter(s => s.id !== scoreId);
+  await recordTombstone('scores', scoreId);
   const relatedPerfs = db.performances.filter(p => p.score_id === scoreId);
-  for (const p of relatedPerfs) await idbDelete('performances', p.id);
+  for (const p of relatedPerfs) {
+    await idbDelete('performances', p.id);
+    await recordTombstone('performances', p.id);
+  }
   db.performances = db.performances.filter(p => p.score_id !== scoreId);
   if (scoresForWork(score.work_id).length === 0) {
     await idbDelete('works', score.work_id);
     db.works = db.works.filter(w => w.id !== score.work_id);
+    await recordTombstone('works', score.work_id);
   }
   scheduleSync();
   renderResults();
@@ -545,8 +556,12 @@ async function updateConcert(id, { name, date }) {
 async function deleteConcert(id) {
   await idbDelete('concerts', id);
   db.concerts = db.concerts.filter(c => c.id !== id);
+  await recordTombstone('concerts', id);
   const related = db.performances.filter(p => p.concert_id === id);
-  for (const p of related) await idbDelete('performances', p.id);
+  for (const p of related) {
+    await idbDelete('performances', p.id);
+    await recordTombstone('performances', p.id);
+  }
   db.performances = db.performances.filter(p => p.concert_id !== id);
 }
 function performanceCountForConcert(id) { return db.performances.filter(p => p.concert_id === id).length; }
@@ -560,6 +575,7 @@ async function addPerformance({ scoreId, concertName, concertDate }) {
 async function deletePerformance(id) {
   await idbDelete('performances', id);
   db.performances = db.performances.filter(p => p.id !== id);
+  await recordTombstone('performances', id);
 }
 function latestConcertNameForScore(scoreId) {
   const concerts = performancesForScore(scoreId).map(p => concertById(p.concert_id)).filter(Boolean);
@@ -1765,9 +1781,7 @@ async function ensureSyncPermission() {
 
 let syncDebounceTimer = null;
 let driveSyncDebounceTimer = null;
-let hasPendingLocalChanges = false;
 function scheduleSync() {
-  hasPendingLocalChanges = true;
   if (syncHandle && supportsFSA) {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = setTimeout(() => performSync(), 1500);
@@ -1779,21 +1793,49 @@ function scheduleSync() {
 }
 
 async function buildExportData() {
+  const tombstones = await idbGetAll('tombstones');
   return {
     meta: { updated_at: nowIso() },
     works: db.works, scores: db.scores, composers: db.composers, parts: db.parts,
     concerts: db.concerts, performances: db.performances,
+    tombstones,
   };
 }
 
-async function applyImportedData(data) {
-  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
-    const all = await idbGetAll(store);
-    for (const item of all) await idbDelete(store, item.id);
+const MERGE_TABLES = ['composers', 'parts', 'concerts', 'works', 'scores', 'performances'];
+const TOMBSTONE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90日経ったら削除記録も掃除
+
+// リモートのデータを、この端末のデータと「両方の変更を保ったまま」合成する
+// （どちらかで新しく追加された項目は両方残り、削除された項目は両方から消える）
+async function mergeImportedData(remoteData) {
+  const localTombstones = await idbGetAll('tombstones');
+  const remoteTombstones = remoteData.tombstones || [];
+  const tombstoneMap = new Map();
+  for (const t of [...localTombstones, ...remoteTombstones]) tombstoneMap.set(t.id, t);
+
+  for (const table of MERGE_TABLES) {
+    const localList = db[table];
+    const remoteList = remoteData[table] || [];
+    const map = new Map();
+    for (const item of remoteList) map.set(item.id, item);
+    for (const item of localList) map.set(item.id, item); // 同じIDならこの端末の内容を優先
+    for (const t of tombstoneMap.values()) {
+      if (t.table === table) map.delete(t.recordId);
+    }
+    const merged = [...map.values()];
+    const existing = await idbGetAll(table);
+    for (const item of existing) await idbDelete(table, item.id);
+    for (const item of merged) await idbPut(table, item);
   }
-  for (const table of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
-    for (const item of (data[table] || [])) await idbPut(table, item);
+
+  // 削除記録も合成し、古いものは掃除する
+  const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
+  const existingTombstones = await idbGetAll('tombstones');
+  for (const t of existingTombstones) await idbDelete('tombstones', t.id);
+  for (const t of tombstoneMap.values()) {
+    if (new Date(t.deletedAt).getTime() >= cutoff) await idbPut('tombstones', t);
   }
+
   fileUrlCache.clear();
   await loadData();
   await cleanupOrphanLocalBlobs();
@@ -1885,32 +1927,13 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       return;
     }
 
-    const file = await syncHandle.getFile();
-    const remoteModified = file.lastModified;
-
-    if (!forceWrite && syncLastModified !== null && remoteModified !== syncLastModified) {
-      const pullRemote = async () => {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        await applyImportedData(data);
-        await importMissingLocalFiles(data);
-        syncLastModified = remoteModified;
-        await saveSyncMeta();
-        setSyncStatus('他の端末の更新を取り込みました：' + new Date().toLocaleTimeString());
-      };
-      if (!hasPendingLocalChanges) {
-        // この端末では何も変更していないので、確認なしで最新を取り込む
-        await pullRemote();
-        return;
-      }
-      const useCloud = confirm(
-        '他の端末でこのデータが更新されています。\n' +
-        'OK：クラウド側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
-        'キャンセル：この端末の内容でクラウド側を上書きする'
-      );
-      if (useCloud) {
-        await pullRemote();
-        return;
+    if (!forceWrite) {
+      const file = await syncHandle.getFile();
+      const text = await file.text();
+      if (text.trim()) {
+        const remoteData = JSON.parse(text);
+        await mergeImportedData(remoteData);
+        await importMissingLocalFiles(remoteData);
       }
     }
 
@@ -1920,10 +1943,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     const writable = await syncHandle.createWritable();
     await writable.write(JSON.stringify(data));
     await writable.close();
-    const newFile = await syncHandle.getFile();
-    syncLastModified = newFile.lastModified;
     await saveSyncMeta();
-    hasPendingLocalChanges = false;
     setSyncStatus('同期済み：' + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('sync failed', err);
@@ -2202,32 +2222,13 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       }
     }
 
-    const metaRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
-    const metaData = await metaRes.json();
-    const remoteModified = metaData.modifiedTime;
-
-    if (!forceWrite && driveLastModified !== null && remoteModified !== driveLastModified) {
-      const pullRemote = async () => {
-        const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
-        const data = await contentRes.json();
-        await applyImportedData(data);
-        await importMissingDriveFiles(data);
-        driveLastModified = remoteModified;
-        await saveDriveMeta();
-        setDriveStatus('他の端末の更新を取り込みました：' + new Date().toLocaleTimeString());
-      };
-      if (!hasPendingLocalChanges) {
-        await pullRemote();
-        return;
-      }
-      const useCloud = confirm(
-        '他の端末でこのデータが更新されています（Google Drive）。\n' +
-        'OK：Google Drive側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
-        'キャンセル：この端末の内容でGoogle Drive側を上書きする'
-      );
-      if (useCloud) {
-        await pullRemote();
-        return;
+    if (!forceWrite) {
+      const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+      const text = await contentRes.text();
+      if (text.trim()) {
+        const remoteData = JSON.parse(text);
+        await mergeImportedData(remoteData);
+        await importMissingDriveFiles(remoteData);
       }
     }
 
@@ -2239,11 +2240,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    const newMetaRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
-    const newMeta = await newMetaRes.json();
-    driveLastModified = newMeta.modifiedTime;
     await saveDriveMeta();
-    hasPendingLocalChanges = false;
     setDriveStatus('同期済み：' + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('drive sync failed', err);
