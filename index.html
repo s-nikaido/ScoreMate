@@ -329,7 +329,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.010</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.011</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -1657,7 +1657,7 @@ syncHeaderBtn.addEventListener('click', async () => {
   }
   syncHeaderBtn.style.opacity = '0.4';
   if (syncHandle) await performSync({ manual: true });
-  if (driveFileId && !isMobileUA) await performDriveSync({ manual: true });
+  if (driveFileId) await performDriveSync({ manual: true });
   syncHeaderBtn.style.opacity = '1';
 });
 
@@ -1675,7 +1675,7 @@ function setupSyncIntervalTimer() {
   if (minutes > 0 && (syncHandle || driveFileId)) {
     syncIntervalTimer = setInterval(() => {
       if (syncHandle) performSync();
-      if (driveFileId && !isMobileUA) performDriveSync();
+      if (driveFileId) performDriveSync();
     }, minutes * 60 * 1000);
   }
 }
@@ -1720,7 +1720,7 @@ function scheduleSync() {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = setTimeout(() => performSync(), 1500);
   }
-  if (driveFileId && !isMobileUA) {
+  if (driveFileId) {
     clearTimeout(driveSyncDebounceTimer);
     driveSyncDebounceTimer = setTimeout(() => performDriveSync(), 1500);
   }
@@ -1835,10 +1835,10 @@ function refreshDriveUI() {
   const pcUi = document.getElementById('drive-pc-ui');
   if (isMobileUA) {
     mobileNote.style.display = 'block';
-    pcUi.style.display = 'none';
-    return;
+    mobileNote.textContent = 'スマートフォンでは実験的な対応です。うまく動かない場合はPCのブラウザをお試しください。';
+  } else {
+    mobileNote.style.display = 'none';
   }
-  mobileNote.style.display = 'none';
   pcUi.style.display = 'block';
   const nowBtn = document.getElementById('drive-sync-now-btn');
   if (!GOOGLE_DRIVE_CLIENT_ID) {
@@ -1942,7 +1942,7 @@ document.getElementById('drive-connect-btn').addEventListener('click', async () 
 document.getElementById('drive-sync-now-btn').addEventListener('click', () => performDriveSync({ manual: true }));
 
 async function performDriveSync({ forceWrite = false, manual = false } = {}) {
-  if (isMobileUA || !driveFileId || driveSyncInProgress) return;
+  if (!driveFileId || driveSyncInProgress) return;
   driveSyncInProgress = true;
   try {
     if (!driveAccessToken) {
@@ -2007,7 +2007,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     await performSync();
     setupSyncIntervalTimer();
   }
-  if (driveFileId && !isMobileUA) {
+  if (driveFileId) {
     await performDriveSync();
     setupSyncIntervalTimer();
   }
