@@ -65,6 +65,23 @@
   #menu-btn span { display: block; width: 20px; height: 2px; background: var(--text); margin: 0 auto; }
   @keyframes sync-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   #sync-now-header-btn.syncing { display: inline-block; animation: sync-spin 0.9s linear infinite; color: var(--accent) !important; }
+  #sync-center-banner {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--text);
+    color: var(--surface);
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-family: var(--font-serif);
+    z-index: 20;
+    pointer-events: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  }
+  #sync-center-banner.show { display: block; }
   .menu-dropdown {
     display: none; position: absolute; top: 40px; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -333,8 +350,10 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.022</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.023</footer>
 </div>
+
+<div id="sync-center-banner">更新中…</div>
 
 <div class="modal-overlay" id="image-modal">
   <img id="modal-image" src="">
@@ -1794,13 +1813,18 @@ async function cleanupOrphanLocalBlobs() {
 
 // ---- 同期中インジケータ（ヘッダーアイコンの回転） ----
 let syncSpinCount = 0;
+const syncCenterBanner = document.getElementById('sync-center-banner');
 function startSyncSpin() {
   syncSpinCount++;
   syncHeaderBtn.classList.add('syncing');
+  syncCenterBanner.classList.add('show');
 }
 function stopSyncSpin() {
   syncSpinCount = Math.max(0, syncSpinCount - 1);
-  if (syncSpinCount === 0) syncHeaderBtn.classList.remove('syncing');
+  if (syncSpinCount === 0) {
+    syncHeaderBtn.classList.remove('syncing');
+    syncCenterBanner.classList.remove('show');
+  }
 }
 
 async function pushLocalFiles() {
