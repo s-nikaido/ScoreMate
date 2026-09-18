@@ -314,6 +314,7 @@
           <div id="drive-pc-ui">
             <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
             <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveにつなぐ</button>
+            <p id="drive-popup-hint" style="font-size:11px; color:var(--text-muted); margin:0 0 8px; display:none;">つながらない場合は、iPhoneの「設定」→「Safari」→「ポップアップブロック」をオフにしてから、もう一度お試しください。</p>
             <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐ保存する</button>
           </div>
         </div>
@@ -332,7 +333,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.018</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.022</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -1745,7 +1746,9 @@ async function ensureSyncPermission() {
 
 let syncDebounceTimer = null;
 let driveSyncDebounceTimer = null;
+let hasPendingLocalChanges = false;
 function scheduleSync() {
+  hasPendingLocalChanges = true;
   if (syncHandle && supportsFSA) {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = setTimeout(() => performSync(), 1500);
@@ -1774,7 +1777,19 @@ async function applyImportedData(data) {
   }
   fileUrlCache.clear();
   await loadData();
+  await cleanupOrphanLocalBlobs();
   renderResults();
+}
+
+async function cleanupOrphanLocalBlobs() {
+  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const allFiles = await idbGetAll('files');
+  for (const rec of allFiles) {
+    if (!referencedIds.has(rec.id)) {
+      await idbDelete('files', rec.id);
+      fileUrlCache.delete(rec.id);
+    }
+  }
 }
 
 // ---- 同期中インジケータ（ヘッダーアイコンの回転） ----
@@ -1803,6 +1818,20 @@ async function pushLocalFiles() {
       await w.close();
     } catch (err) { console.error('write local file failed', fname, err); }
   }
+}
+
+async function cleanupLocalOrphanFiles() {
+  if (!syncFilesDirHandle) return;
+  const referencedNames = new Set(
+    db.scores.filter(s => s.image_file_id).map(s => fileNameFor(s.image_file_id, s.image_type))
+  );
+  try {
+    for await (const [name] of syncFilesDirHandle.entries()) {
+      if (!referencedNames.has(name)) {
+        await syncFilesDirHandle.removeEntry(name).catch(() => {});
+      }
+    }
+  } catch (err) { console.error('cleanup local orphan files failed', err); }
 }
 
 async function importMissingLocalFiles(data) {
@@ -1836,24 +1865,33 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     const remoteModified = file.lastModified;
 
     if (!forceWrite && syncLastModified !== null && remoteModified !== syncLastModified) {
-      const useCloud = confirm(
-        '他の端末でこのデータが更新されています。\n' +
-        'OK：クラウド側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
-        'キャンセル：この端末の内容でクラウド側を上書きする'
-      );
-      if (useCloud) {
+      const pullRemote = async () => {
         const text = await file.text();
         const data = JSON.parse(text);
         await applyImportedData(data);
         await importMissingLocalFiles(data);
         syncLastModified = remoteModified;
         await saveSyncMeta();
-        setSyncStatus('クラウドの内容を取り込みました：' + new Date().toLocaleTimeString());
+        setSyncStatus('他の端末の更新を取り込みました：' + new Date().toLocaleTimeString());
+      };
+      if (!hasPendingLocalChanges) {
+        // この端末では何も変更していないので、確認なしで最新を取り込む
+        await pullRemote();
+        return;
+      }
+      const useCloud = confirm(
+        '他の端末でこのデータが更新されています。\n' +
+        'OK：クラウド側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
+        'キャンセル：この端末の内容でクラウド側を上書きする'
+      );
+      if (useCloud) {
+        await pullRemote();
         return;
       }
     }
 
     await pushLocalFiles();
+    await cleanupLocalOrphanFiles();
     const data = await buildExportData();
     const writable = await syncHandle.createWritable();
     await writable.write(JSON.stringify(data));
@@ -1861,6 +1899,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     const newFile = await syncHandle.getFile();
     syncLastModified = newFile.lastModified;
     await saveSyncMeta();
+    hasPendingLocalChanges = false;
     setSyncStatus('同期済み：' + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('sync failed', err);
@@ -1917,11 +1956,14 @@ async function saveDriveMeta() {
 function refreshDriveUI() {
   const mobileNote = document.getElementById('drive-mobile-note');
   const pcUi = document.getElementById('drive-pc-ui');
+  const popupHint = document.getElementById('drive-popup-hint');
   if (isMobileUA) {
     mobileNote.style.display = 'block';
     mobileNote.textContent = 'スマートフォンでは実験的な対応です。うまく動かない場合はPCのブラウザをお試しください。';
+    popupHint.style.display = 'block';
   } else {
     mobileNote.style.display = 'none';
+    popupHint.style.display = 'none';
   }
   pcUi.style.display = 'block';
   const nowBtn = document.getElementById('drive-sync-now-btn');
@@ -1960,7 +2002,7 @@ function ensureDriveTokenClient() {
 }
 
 function requestDriveToken({ silent = false } = {}) {
-  return new Promise((resolve) => {
+  const tokenPromise = new Promise((resolve) => {
     const client = ensureDriveTokenClient();
     if (!client) { resolve(false); return; }
     const originalCallback = client.callback;
@@ -1976,6 +2018,14 @@ function requestDriveToken({ silent = false } = {}) {
     };
     client.requestAccessToken(silent ? { prompt: '' } : {});
   });
+  const timeoutMs = silent ? 8000 : 60000;
+  const timeoutPromise = new Promise((resolve) => {
+    setTimeout(() => {
+      if (!silent) setDriveStatus('応答がありませんでした（ポップアップがブロックされていないか確認してください）');
+      resolve(false);
+    }, timeoutMs);
+  });
+  return Promise.race([tokenPromise, timeoutPromise]);
 }
 
 async function driveApiFetch(url, options = {}) {
@@ -2060,6 +2110,23 @@ async function pushDriveFiles() {
   }
 }
 
+async function cleanupDriveOrphanFiles() {
+  if (!driveFilesFolderId) return;
+  const referencedNames = new Set(
+    db.scores.filter(s => s.image_file_id).map(s => fileNameFor(s.image_file_id, s.image_type))
+  );
+  try {
+    const q = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
+    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+    const listData = await listRes.json();
+    for (const f of (listData.files || [])) {
+      if (!referencedNames.has(f.name)) {
+        await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' }).catch(() => {});
+      }
+    }
+  } catch (err) { console.error('cleanup drive orphan files failed', err); }
+}
+
 async function importMissingDriveFiles(data) {
   if (!driveFilesFolderId) return;
   for (const score of (data.scores || [])) {
@@ -2116,24 +2183,32 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     const remoteModified = metaData.modifiedTime;
 
     if (!forceWrite && driveLastModified !== null && remoteModified !== driveLastModified) {
-      const useCloud = confirm(
-        '他の端末でこのデータが更新されています（Google Drive）。\n' +
-        'OK：Google Drive側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
-        'キャンセル：この端末の内容でGoogle Drive側を上書きする'
-      );
-      if (useCloud) {
+      const pullRemote = async () => {
         const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
         const data = await contentRes.json();
         await applyImportedData(data);
         await importMissingDriveFiles(data);
         driveLastModified = remoteModified;
         await saveDriveMeta();
-        setDriveStatus('Google Driveの内容を取り込みました：' + new Date().toLocaleTimeString());
+        setDriveStatus('他の端末の更新を取り込みました：' + new Date().toLocaleTimeString());
+      };
+      if (!hasPendingLocalChanges) {
+        await pullRemote();
+        return;
+      }
+      const useCloud = confirm(
+        '他の端末でこのデータが更新されています（Google Drive）。\n' +
+        'OK：Google Drive側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
+        'キャンセル：この端末の内容でGoogle Drive側を上書きする'
+      );
+      if (useCloud) {
+        await pullRemote();
         return;
       }
     }
 
     await pushDriveFiles();
+    await cleanupDriveOrphanFiles();
     const data = await buildExportData();
     await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
       method: 'PATCH',
@@ -2144,6 +2219,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     const newMeta = await newMetaRes.json();
     driveLastModified = newMeta.modifiedTime;
     await saveDriveMeta();
+    hasPendingLocalChanges = false;
     setDriveStatus('同期済み：' + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('drive sync failed', err);
