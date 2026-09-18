@@ -350,14 +350,10 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.024</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.026</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
-
-<div class="modal-overlay" id="image-modal">
-  <img id="modal-image" src="">
-</div>
 
 <div class="modal-overlay" id="skew-modal">
   <div style="background:var(--surface); border-radius:12px; padding:16px; max-width:480px; width:100%; max-height:90vh; display:flex; flex-direction:column;">
@@ -712,11 +708,7 @@ async function appendWorkCards(filteredList) {
         row.querySelector('.thumb').addEventListener('click', async (e) => {
           e.stopPropagation();
           const url = await getFileUrl(s.image_file_id);
-          if (isPdfType(s.image_type)) {
-            window.open(url, '_blank');
-          } else {
-            openImageModal(url);
-          }
+          window.open(url, '_blank');
         });
       }
       row.querySelector('.edit').addEventListener('click', (e) => { e.stopPropagation(); startEditScore(s.id); });
@@ -799,10 +791,6 @@ async function renderResults() {
   await appendWorkCards(filtered);
 }
 
-const imageModal = document.getElementById('image-modal');
-const modalImage = document.getElementById('modal-image');
-function openImageModal(src) { modalImage.src = src; imageModal.classList.add('open'); }
-imageModal.addEventListener('click', (e) => { if (e.target === imageModal) imageModal.classList.remove('open'); });
 
 // ================== 登録画面 ==================
 const fTitle = document.getElementById('f-title');
@@ -951,6 +939,7 @@ photoFile.addEventListener('change', () => {
   const files = Array.from(photoFile.files);
   if (files.length === 0) return;
   selectedFiles = files;
+  updateCorrectSkewBtnVisibility();
   if (files.length > 1) {
     photoPreview.style.display = 'none';
     photoPlaceholder.style.display = 'block';
@@ -1300,9 +1289,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     let imageFileId = existingImageFileId;
     let imageType = existingImageType;
-    if (selectedFiles.length > 1) {
+    const hasImages = selectedFiles.some(f => f.type.startsWith('image/'));
+    if (selectedFiles.length > 0 && hasImages) {
       saveBtn.textContent = 'PDFに変換中…';
-      const pdfFile = await imagesToPdfFile(selectedFiles);
+      const pdfFile = await imagesToPdfFile(selectedFiles.filter(f => f.type.startsWith('image/')));
       saveBtn.textContent = '保存中…';
       imageFileId = await saveImageFile(pdfFile);
       imageType = pdfFile.type;
