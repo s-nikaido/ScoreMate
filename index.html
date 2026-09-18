@@ -277,16 +277,47 @@
       </div>
       <div class="field">
         <label>モデル名</label>
-        <input type="text" id="gemini-model-name" placeholder="gemini-3.5-flash">
+        <select id="gemini-model-name">
+          <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+        </select>
+        <div class="hint" id="model-fetch-status" style="display:none;"></div>
+        <button type="button" id="model-fetch-btn" style="width:100%; margin-top:6px; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:12px; cursor:pointer;">利用可能なモデルを取得</button>
       </div>
       <button class="primary" id="gemini-settings-save-btn">保存</button>
 
       <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:16px;">
-        <label>クラウド同期</label>
-        <p id="sync-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未設定</p>
-        <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">同期ファイルを選択</button>
-        <button type="button" id="sync-now-btn" style="width:100%; margin-bottom:12px; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ同期</button>
-        <label>自動同期の間隔</label>
+        <label>データの保管方法</label>
+        <div class="chip-row" id="sync-category-chips" style="margin-bottom:12px;">
+          <span class="chip" data-category="local">ローカル</span>
+          <span class="chip" data-category="cloud">同期</span>
+        </div>
+
+        <div id="sync-category-local">
+          <label>方式</label>
+          <select id="local-method-select" style="margin-bottom:12px;">
+            <option value="folder">フォルダ／ファイルを選択（PC推奨）</option>
+          </select>
+          <p id="sync-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未設定</p>
+          <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">同期ファイルを選択</button>
+          <button type="button" id="sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ同期</button>
+        </div>
+
+        <div id="sync-category-cloud">
+          <label>同期先</label>
+          <select id="cloud-provider-select" style="margin-bottom:12px;">
+            <option value="google-drive">Google Drive</option>
+          </select>
+          <p id="drive-mobile-note" style="font-size:12px; color:var(--text-muted); display:none;">スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。</p>
+          <div id="drive-pc-ui">
+            <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
+            <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveに接続</button>
+            <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐGoogle Driveと同期</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px;">
+        <label>自動同期の間隔（両方式共通）</label>
         <select id="sync-interval-select">
           <option value="0">変更時のみ（定期同期しない）</option>
           <option value="5">5分ごと</option>
@@ -298,7 +329,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.005</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.010</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -326,6 +357,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 // ================== IndexedDBラッパー ==================
 const IDB_NAME = 'scoremate';
@@ -553,7 +585,7 @@ function showView(name) {
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
   if (name === 'parts') renderPartMasterList();
-  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); syncIntervalSelect.value = String(getSyncIntervalMinutes()); }
+  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); }
 }
 menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menuDropdown.classList.toggle('open'); });
 document.addEventListener('click', () => menuDropdown.classList.remove('open'));
@@ -1379,10 +1411,66 @@ document.getElementById('concert-new-add-btn').addEventListener('click', async (
 // ================== Gemini設定 ==================
 const geminiApiKeyInput = document.getElementById('gemini-api-key');
 const geminiModelNameInput = document.getElementById('gemini-model-name');
+function ensureModelOption(name) {
+  if (!name) return;
+  let opt = [...geminiModelNameInput.options].find(o => o.value === name);
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    geminiModelNameInput.insertBefore(opt, geminiModelNameInput.firstChild);
+  }
+  geminiModelNameInput.value = name;
+}
+
 function loadGeminiSettingsIntoForm() {
   geminiApiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
-  geminiModelNameInput.value = localStorage.getItem('gemini_model_name') || 'gemini-3.5-flash';
+  ensureModelOption(localStorage.getItem('gemini_model_name') || 'gemini-3.5-flash');
+  if (geminiApiKeyInput.value) fetchAvailableModels(true);
 }
+
+async function fetchAvailableModels(silent = false) {
+  const apiKey = geminiApiKeyInput.value.trim() || localStorage.getItem('gemini_api_key');
+  const statusEl = document.getElementById('model-fetch-status');
+  if (!apiKey) {
+    if (!silent) alert('先にAPIキーを入力してください');
+    return;
+  }
+  statusEl.style.display = 'block';
+  statusEl.textContent = '取得中…';
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || '取得に失敗しました');
+    const candidates = (data.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace(/^models\//, ''))
+      .filter(name => !name.includes('embedding') && !name.includes('aqa') && !name.includes('image-generation'));
+    if (candidates.length === 0) throw new Error('画像に対応したモデルが見つかりませんでした');
+
+    const currentValue = geminiModelNameInput.value;
+    geminiModelNameInput.innerHTML = '';
+    candidates.sort((a, b) => a.localeCompare(b));
+    candidates.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      geminiModelNameInput.appendChild(opt);
+    });
+    const preferred = candidates.find(n => n === currentValue)
+      || candidates.find(n => n.includes('flash') && !n.includes('lite') && !n.includes('8b'))
+      || candidates.find(n => n.includes('flash'))
+      || candidates[0];
+    geminiModelNameInput.value = preferred;
+    statusEl.textContent = `${candidates.length}件のモデルを取得しました（${preferred} を選択中）`;
+  } catch (err) {
+    statusEl.textContent = '取得に失敗しました：' + err.message;
+    if (!silent) alert('取得に失敗しました：' + err.message);
+  }
+}
+document.getElementById('model-fetch-btn').addEventListener('click', () => fetchAvailableModels(false));
+geminiApiKeyInput.addEventListener('blur', () => { if (geminiApiKeyInput.value.trim()) fetchAvailableModels(true); });
+
 document.getElementById('gemini-settings-save-btn').addEventListener('click', () => {
   localStorage.setItem('gemini_api_key', geminiApiKeyInput.value.trim());
   localStorage.setItem('gemini_model_name', geminiModelNameInput.value.trim() || 'gemini-3.5-flash');
@@ -1524,6 +1612,24 @@ async function saveSyncMeta() {
   await idbPut('meta', { id: 'main', handle: syncHandle, lastKnownModified: syncLastModified });
 }
 
+// ---- 保管方法カテゴリの切り替え（ローカル / 同期） ----
+const syncCategoryChips = document.getElementById('sync-category-chips');
+const syncCategoryLocalEl = document.getElementById('sync-category-local');
+const syncCategoryCloudEl = document.getElementById('sync-category-cloud');
+
+function getSyncCategory() {
+  return localStorage.getItem('sync_category') || 'local';
+}
+function applySyncCategory(category) {
+  localStorage.setItem('sync_category', category);
+  [...syncCategoryChips.children].forEach(c => c.classList.toggle('active', c.dataset.category === category));
+  syncCategoryLocalEl.style.display = category === 'local' ? 'block' : 'none';
+  syncCategoryCloudEl.style.display = category === 'cloud' ? 'block' : 'none';
+}
+syncCategoryChips.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => applySyncCategory(chip.dataset.category));
+});
+
 function refreshSyncUI() {
   const setupBtn = document.getElementById('sync-setup-btn');
   const nowBtn = document.getElementById('sync-now-btn');
@@ -1545,10 +1651,13 @@ function refreshSyncUI() {
 // ---- ヘッダーの同期ボタン ----
 const syncHeaderBtn = document.getElementById('sync-now-header-btn');
 syncHeaderBtn.addEventListener('click', async () => {
-  if (!supportsFSA) { alert('このブラウザは自動同期に対応していません（メニューの書き出し/読み込みをご利用ください）'); return; }
-  if (!syncHandle) { alert('先に「設定」画面で同期ファイルを選択してください'); return; }
+  if (!syncHandle && !driveFileId) {
+    alert('先に「設定」画面で同期先を設定してください');
+    return;
+  }
   syncHeaderBtn.style.opacity = '0.4';
-  await performSync({ manual: true });
+  if (syncHandle) await performSync({ manual: true });
+  if (driveFileId && !isMobileUA) await performDriveSync({ manual: true });
   syncHeaderBtn.style.opacity = '1';
 });
 
@@ -1563,8 +1672,11 @@ function getSyncIntervalMinutes() {
 function setupSyncIntervalTimer() {
   clearInterval(syncIntervalTimer);
   const minutes = getSyncIntervalMinutes();
-  if (minutes > 0 && syncHandle) {
-    syncIntervalTimer = setInterval(() => performSync(), minutes * 60 * 1000);
+  if (minutes > 0 && (syncHandle || driveFileId)) {
+    syncIntervalTimer = setInterval(() => {
+      if (syncHandle) performSync();
+      if (driveFileId && !isMobileUA) performDriveSync();
+    }, minutes * 60 * 1000);
   }
 }
 syncIntervalSelect.addEventListener('change', () => {
@@ -1602,10 +1714,16 @@ async function ensureSyncPermission() {
 }
 
 let syncDebounceTimer = null;
+let driveSyncDebounceTimer = null;
 function scheduleSync() {
-  if (!syncHandle || !supportsFSA) return;
-  clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(() => performSync(), 1500);
+  if (syncHandle && supportsFSA) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(() => performSync(), 1500);
+  }
+  if (driveFileId && !isMobileUA) {
+    clearTimeout(driveSyncDebounceTimer);
+    driveSyncDebounceTimer = setTimeout(() => performDriveSync(), 1500);
+  }
 }
 
 async function buildExportData() {
@@ -1684,15 +1802,213 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
   }
 }
 
+// ================== Google Drive連携（PC向け・実験的） ==================
+// ---- 開発者向け設定：Google Cloud Consoleで作成したOAuthクライアントIDをここに設定してください ----
+// 参考: https://console.cloud.google.com/apis/credentials （種類：ウェブアプリケーション）
+const GOOGLE_DRIVE_CLIENT_ID = '394747709835-eteu9duk0qh5mv7q2dim3mdhr5ghttje.apps.googleusercontent.com';
+
+const DRIVE_FILE_NAME = 'scoremate-data.json';
+const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+let driveAccessToken = null;
+let driveFileId = null;
+let driveLastModified = null;
+let driveTokenClient = null;
+let driveSyncInProgress = false;
+
+function setDriveStatus(text) {
+  const el = document.getElementById('drive-status');
+  if (el) el.textContent = text;
+}
+
+async function loadDriveMeta() {
+  try {
+    const rec = await idbGet('meta', 'drive');
+    if (rec) { driveFileId = rec.fileId || null; driveLastModified = rec.lastKnownModified || null; }
+  } catch (err) { console.error('drive meta load failed', err); }
+}
+async function saveDriveMeta() {
+  await idbPut('meta', { id: 'drive', fileId: driveFileId, lastKnownModified: driveLastModified });
+}
+
+function refreshDriveUI() {
+  const mobileNote = document.getElementById('drive-mobile-note');
+  const pcUi = document.getElementById('drive-pc-ui');
+  if (isMobileUA) {
+    mobileNote.style.display = 'block';
+    pcUi.style.display = 'none';
+    return;
+  }
+  mobileNote.style.display = 'none';
+  pcUi.style.display = 'block';
+  const nowBtn = document.getElementById('drive-sync-now-btn');
+  if (!GOOGLE_DRIVE_CLIENT_ID) {
+    setDriveStatus('この機能は現在準備中です');
+    nowBtn.style.display = 'none';
+    return;
+  }
+  if (driveFileId) {
+    setDriveStatus('接続済み（' + DRIVE_FILE_NAME + '）');
+    nowBtn.style.display = 'block';
+  } else {
+    setDriveStatus('未接続');
+    nowBtn.style.display = 'none';
+  }
+}
+
+function ensureDriveTokenClient() {
+  const clientId = GOOGLE_DRIVE_CLIENT_ID;
+  if (!clientId) { alert('この機能は現在準備中です'); return null; }
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    alert('Googleの認証ライブラリの読み込みに失敗しました。少し待ってからお試しください。');
+    return null;
+  }
+  if (!driveTokenClient) {
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        if (resp.error) { setDriveStatus('接続に失敗しました：' + resp.error); return; }
+        driveAccessToken = resp.access_token;
+      },
+    });
+  }
+  return driveTokenClient;
+}
+
+function requestDriveToken({ silent = false } = {}) {
+  return new Promise((resolve) => {
+    const client = ensureDriveTokenClient();
+    if (!client) { resolve(false); return; }
+    const originalCallback = client.callback;
+    client.callback = (resp) => {
+      client.callback = originalCallback;
+      if (resp.error) {
+        if (!silent) setDriveStatus('接続に失敗しました：' + resp.error);
+        resolve(false);
+        return;
+      }
+      driveAccessToken = resp.access_token;
+      resolve(true);
+    };
+    client.requestAccessToken(silent ? { prompt: '' } : {});
+  });
+}
+
+async function driveApiFetch(url, options = {}) {
+  if (!driveAccessToken) throw new Error('Google Driveに未接続です');
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + driveAccessToken },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Drive APIエラー（${res.status}）：${text.slice(0, 200)}`);
+  }
+  return res;
+}
+
+async function findOrCreateDriveFile() {
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`);
+  const listData = await listRes.json();
+  if (listData.files && listData.files.length > 0) {
+    driveFileId = listData.files[0].id;
+    return;
+  }
+  const createRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FILE_NAME }),
+  });
+  const created = await createRes.json();
+  driveFileId = created.id;
+}
+
+document.getElementById('drive-connect-btn').addEventListener('click', async () => {
+  const ok = await requestDriveToken({ silent: false });
+  if (!ok) return;
+  setDriveStatus('接続中の処理をしています…');
+  try {
+    await findOrCreateDriveFile();
+    driveLastModified = null;
+    await saveDriveMeta();
+    refreshDriveUI();
+    await performDriveSync({ forceWrite: true });
+    setupSyncIntervalTimer();
+  } catch (err) {
+    setDriveStatus('接続に失敗しました：' + err.message);
+  }
+});
+document.getElementById('drive-sync-now-btn').addEventListener('click', () => performDriveSync({ manual: true }));
+
+async function performDriveSync({ forceWrite = false, manual = false } = {}) {
+  if (isMobileUA || !driveFileId || driveSyncInProgress) return;
+  driveSyncInProgress = true;
+  try {
+    if (!driveAccessToken) {
+      const ok = await requestDriveToken({ silent: true });
+      if (!ok) {
+        setDriveStatus('接続の更新が必要です。「Google Driveに接続」を押してください');
+        return;
+      }
+    }
+
+    const metaRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
+    const metaData = await metaRes.json();
+    const remoteModified = metaData.modifiedTime;
+
+    if (!forceWrite && driveLastModified !== null && remoteModified !== driveLastModified) {
+      const useCloud = confirm(
+        '他の端末でこのデータが更新されています（Google Drive）。\n' +
+        'OK：Google Drive側の最新データを取り込む（この端末の未反映の変更は失われます）\n' +
+        'キャンセル：この端末の内容でGoogle Drive側を上書きする'
+      );
+      if (useCloud) {
+        const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+        const data = await contentRes.json();
+        await applyImportedData(data);
+        driveLastModified = remoteModified;
+        await saveDriveMeta();
+        setDriveStatus('Google Driveの内容を取り込みました：' + new Date().toLocaleTimeString());
+        return;
+      }
+    }
+
+    const data = await buildExportData();
+    await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const newMetaRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`);
+    const newMeta = await newMetaRes.json();
+    driveLastModified = newMeta.modifiedTime;
+    await saveDriveMeta();
+    setDriveStatus('同期済み：' + new Date().toLocaleTimeString());
+  } catch (err) {
+    console.error('drive sync failed', err);
+    setDriveStatus('同期に失敗しました：' + err.message);
+    if (manual) alert('同期に失敗しました：' + err.message);
+  } finally {
+    driveSyncInProgress = false;
+  }
+}
+
 // ================== 初期化 ==================
 (async () => {
   await openIdb();
   await loadData();
   await loadSyncMeta();
+  await loadDriveMeta();
   refreshSyncUI();
+  refreshDriveUI();
   renderResults();
   if (syncHandle) {
     await performSync();
+    setupSyncIntervalTimer();
+  }
+  if (driveFileId && !isMobileUA) {
+    await performDriveSync();
     setupSyncIntervalTimer();
   }
 })();
