@@ -295,12 +295,9 @@
         </div>
 
         <div id="sync-category-local">
-          <label>方式</label>
-          <select id="local-method-select" style="margin-bottom:12px;">
-            <option value="folder">フォルダ／ファイルを選択（PC推奨）</option>
-          </select>
           <p id="sync-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未設定</p>
-          <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">同期ファイルを選択</button>
+          <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">同期フォルダを選択</button>
+          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">選択したフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。</p>
           <button type="button" id="sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ同期</button>
         </div>
 
@@ -331,7 +328,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.012</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.014</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -1530,6 +1527,17 @@ aiReadBtn.addEventListener('click', async () => {
 });
 
 // ================== 書き出し・読み込み（クラウドドライブ経由の手動同期） ==================
+function extForMime(mime) {
+  if (!mime) return 'bin';
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+  return 'bin';
+}
+function fileNameFor(id, mime) {
+  return `${id}.${extForMime(mime)}`;
+}
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1596,8 +1604,11 @@ document.getElementById('import-file-input').addEventListener('change', async (e
 });
 
 // ================== クラウド同期（File System Access API） ==================
-const supportsFSA = 'showSaveFilePicker' in window;
-let syncHandle = null;
+const supportsFSA = 'showSaveFilePicker' in window && 'showDirectoryPicker' in window;
+const SYNC_FOLDER_NAME = 'ScoreMate';
+let syncDirHandle = null;       // 選んだ場所の中に作られる「ScoreMate」フォルダ
+let syncFilesDirHandle = null;  // その中の「files」サブフォルダ（画像・PDF用）
+let syncHandle = null;          // その中の「data.json」ファイル
 let syncLastModified = null;
 let syncInProgress = false;
 const syncStatusEl = document.getElementById('sync-status');
@@ -1607,11 +1618,22 @@ function setSyncStatus(text) { if (syncStatusEl) syncStatusEl.textContent = text
 async function loadSyncMeta() {
   try {
     const rec = await idbGet('meta', 'main');
-    if (rec) { syncHandle = rec.handle || null; syncLastModified = rec.lastKnownModified || null; }
+    if (rec) {
+      syncDirHandle = rec.dirHandle || null;
+      syncFilesDirHandle = rec.filesDirHandle || null;
+      syncHandle = rec.dataFileHandle || null;
+      syncLastModified = rec.lastKnownModified || null;
+    }
   } catch (err) { console.error('sync meta load failed', err); }
 }
 async function saveSyncMeta() {
-  await idbPut('meta', { id: 'main', handle: syncHandle, lastKnownModified: syncLastModified });
+  await idbPut('meta', {
+    id: 'main',
+    dirHandle: syncDirHandle,
+    filesDirHandle: syncFilesDirHandle,
+    dataFileHandle: syncHandle,
+    lastKnownModified: syncLastModified,
+  });
 }
 
 // ---- 保管方法カテゴリの切り替え（ローカル / 同期） ----
@@ -1644,7 +1666,7 @@ function refreshSyncUI() {
   setupBtn.style.display = 'block';
   nowBtn.style.display = syncHandle ? 'block' : 'none';
   if (syncHandle) {
-    setSyncStatus('設定済み：' + (syncHandle.name || 'scoremate-data.json'));
+    setSyncStatus('設定済み：「' + SYNC_FOLDER_NAME + '」フォルダ内で同期中');
   } else {
     setSyncStatus('未設定（Google Driveなどの同期フォルダ内にファイルを1つ選んでください）');
   }
@@ -1687,11 +1709,13 @@ syncIntervalSelect.addEventListener('change', () => {
 document.getElementById('sync-setup-btn').addEventListener('click', async () => {
   if (!supportsFSA) return;
   try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: 'scoremate-data.json',
-      types: [{ description: 'ScoreMateデータ', accept: { 'application/json': ['.json'] } }],
-    });
-    syncHandle = handle;
+    const parentDir = await window.showDirectoryPicker();
+    const scoreMateDir = await parentDir.getDirectoryHandle(SYNC_FOLDER_NAME, { create: true });
+    const filesDir = await scoreMateDir.getDirectoryHandle('files', { create: true });
+    const dataFileHandle = await scoreMateDir.getFileHandle('data.json', { create: true });
+    syncDirHandle = scoreMateDir;
+    syncFilesDirHandle = filesDir;
+    syncHandle = dataFileHandle;
     syncLastModified = null;
     await saveSyncMeta();
     refreshSyncUI();
@@ -1704,11 +1728,11 @@ document.getElementById('sync-setup-btn').addEventListener('click', async () => 
 document.getElementById('sync-now-btn').addEventListener('click', () => performSync({ forceWrite: false, manual: true }));
 
 async function ensureSyncPermission() {
-  if (!syncHandle) return false;
+  if (!syncDirHandle) return false;
   const opts = { mode: 'readwrite' };
   try {
-    if ((await syncHandle.queryPermission(opts)) === 'granted') return true;
-    if ((await syncHandle.requestPermission(opts)) === 'granted') return true;
+    if ((await syncDirHandle.queryPermission(opts)) === 'granted') return true;
+    if ((await syncDirHandle.requestPermission(opts)) === 'granted') return true;
   } catch (err) { console.error('permission check failed', err); }
   return false;
 }
@@ -1727,26 +1751,17 @@ function scheduleSync() {
 }
 
 async function buildExportData() {
-  const data = {
+  return {
     meta: { updated_at: nowIso() },
     works: db.works, scores: db.scores, composers: db.composers, parts: db.parts,
-    concerts: db.concerts, performances: db.performances, files: [],
+    concerts: db.concerts, performances: db.performances,
   };
-  const fileIds = new Set(db.scores.map(s => s.image_file_id).filter(Boolean));
-  for (const id of fileIds) {
-    const rec = await getImageFile(id);
-    if (rec) data.files.push({ id: rec.id, type: rec.type, base64: await blobToBase64(rec.blob) });
-  }
-  return data;
 }
 
 async function applyImportedData(data) {
-  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files']) {
+  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
     const all = await idbGetAll(store);
     for (const item of all) await idbDelete(store, item.id);
-  }
-  for (const f of (data.files || [])) {
-    await idbPut('files', { id: f.id, blob: base64ToBlob(f.base64, f.type), type: f.type, created_at: nowIso() });
   }
   for (const table of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
     for (const item of (data[table] || [])) await idbPut(table, item);
@@ -1765,6 +1780,39 @@ function startSyncSpin() {
 function stopSyncSpin() {
   syncSpinCount = Math.max(0, syncSpinCount - 1);
   if (syncSpinCount === 0) syncHeaderBtn.classList.remove('syncing');
+}
+
+async function pushLocalFiles() {
+  if (!syncFilesDirHandle) return;
+  const allFiles = await idbGetAll('files');
+  for (const rec of allFiles) {
+    const fname = fileNameFor(rec.id, rec.type);
+    let exists = false;
+    try { await syncFilesDirHandle.getFileHandle(fname); exists = true; } catch (e) { exists = false; }
+    if (exists) continue;
+    try {
+      const fh = await syncFilesDirHandle.getFileHandle(fname, { create: true });
+      const w = await fh.createWritable();
+      await w.write(rec.blob);
+      await w.close();
+    } catch (err) { console.error('write local file failed', fname, err); }
+  }
+}
+
+async function importMissingLocalFiles(data) {
+  if (!syncFilesDirHandle) return;
+  for (const score of (data.scores || [])) {
+    if (!score.image_file_id) continue;
+    const existing = await idbGet('files', score.image_file_id).catch(() => null);
+    if (existing) continue;
+    const fname = fileNameFor(score.image_file_id, score.image_type);
+    try {
+      const fh = await syncFilesDirHandle.getFileHandle(fname);
+      const file = await fh.getFile();
+      await idbPut('files', { id: score.image_file_id, blob: file, type: score.image_type, created_at: nowIso() });
+    } catch (err) { console.error('missing local file', fname, err); }
+  }
+  fileUrlCache.clear();
 }
 
 async function performSync({ forceWrite = false, manual = false } = {}) {
@@ -1789,7 +1837,9 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       );
       if (useCloud) {
         const text = await file.text();
-        await applyImportedData(JSON.parse(text));
+        const data = JSON.parse(text);
+        await applyImportedData(data);
+        await importMissingLocalFiles(data);
         syncLastModified = remoteModified;
         await saveSyncMeta();
         setSyncStatus('クラウドの内容を取り込みました：' + new Date().toLocaleTimeString());
@@ -1797,6 +1847,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       }
     }
 
+    await pushLocalFiles();
     const data = await buildExportData();
     const writable = await syncHandle.createWritable();
     await writable.write(JSON.stringify(data));
@@ -1820,9 +1871,12 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
 // 参考: https://console.cloud.google.com/apis/credentials （種類：ウェブアプリケーション）
 const GOOGLE_DRIVE_CLIENT_ID = '394747709835-eteu9duk0qh5mv7q2dim3mdhr5ghttje.apps.googleusercontent.com';
 
-const DRIVE_FILE_NAME = 'scoremate-data.json';
+const DRIVE_FOLDER_NAME = 'ScoreMate';
+const DRIVE_FILE_NAME = 'data.json';
 const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 let driveAccessToken = null;
+let driveFolderId = null;
+let driveFilesFolderId = null;
 let driveFileId = null;
 let driveLastModified = null;
 let driveTokenClient = null;
@@ -1836,11 +1890,22 @@ function setDriveStatus(text) {
 async function loadDriveMeta() {
   try {
     const rec = await idbGet('meta', 'drive');
-    if (rec) { driveFileId = rec.fileId || null; driveLastModified = rec.lastKnownModified || null; }
+    if (rec) {
+      driveFolderId = rec.folderId || null;
+      driveFilesFolderId = rec.filesFolderId || null;
+      driveFileId = rec.fileId || null;
+      driveLastModified = rec.lastKnownModified || null;
+    }
   } catch (err) { console.error('drive meta load failed', err); }
 }
 async function saveDriveMeta() {
-  await idbPut('meta', { id: 'drive', fileId: driveFileId, lastKnownModified: driveLastModified });
+  await idbPut('meta', {
+    id: 'drive',
+    folderId: driveFolderId,
+    filesFolderId: driveFilesFolderId,
+    fileId: driveFileId,
+    lastKnownModified: driveLastModified,
+  });
 }
 
 function refreshDriveUI() {
@@ -1860,7 +1925,7 @@ function refreshDriveUI() {
     return;
   }
   if (driveFileId) {
-    setDriveStatus('接続済み（' + DRIVE_FILE_NAME + '）');
+    setDriveStatus('接続済み：「' + DRIVE_FOLDER_NAME + '」フォルダ内で同期中');
     nowBtn.style.display = 'block';
   } else {
     setDriveStatus('未接続');
@@ -1920,21 +1985,94 @@ async function driveApiFetch(url, options = {}) {
   return res;
 }
 
-async function findOrCreateDriveFile() {
-  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
-  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)`);
+async function findOrCreateDriveFolder(name, parentId) {
+  const parentClause = parentId ? ` and '${parentId}' in parents` : '';
+  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false${parentClause}`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
   const listData = await listRes.json();
-  if (listData.files && listData.files.length > 0) {
-    driveFileId = listData.files[0].id;
-    return;
-  }
+  if (listData.files && listData.files.length > 0) return listData.files[0].id;
+  const metadata = { name, mimeType: 'application/vnd.google-apps.folder' };
+  if (parentId) metadata.parents = [parentId];
   const createRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: DRIVE_FILE_NAME }),
+    body: JSON.stringify(metadata),
   });
   const created = await createRes.json();
-  driveFileId = created.id;
+  return created.id;
+}
+
+async function findOrCreateDriveDataFile(parentId) {
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and '${parentId}' in parents and trashed=false`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const listData = await listRes.json();
+  if (listData.files && listData.files.length > 0) return listData.files[0].id;
+  const createRes = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FILE_NAME, parents: [parentId] }),
+  });
+  const created = await createRes.json();
+  return created.id;
+}
+
+async function findOrCreateDriveStructure() {
+  driveFolderId = await findOrCreateDriveFolder(DRIVE_FOLDER_NAME);
+  driveFilesFolderId = await findOrCreateDriveFolder('files', driveFolderId);
+  driveFileId = await findOrCreateDriveDataFile(driveFolderId);
+}
+
+async function pushDriveFiles() {
+  if (!driveFilesFolderId) return;
+  const allFiles = await idbGetAll('files');
+  for (const rec of allFiles) {
+    const fname = fileNameFor(rec.id, rec.type);
+    const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
+    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+    const listData = await listRes.json();
+    if (listData.files && listData.files.length > 0) continue;
+
+    try {
+      const boundary = 'scoremate' + Date.now();
+      const metadata = { name: fname, parents: [driveFilesFolderId] };
+      const base64Data = await blobToBase64(rec.blob);
+      const body =
+        `--${boundary}\r\n` +
+        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+        JSON.stringify(metadata) + `\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Type: ${rec.type}\r\n` +
+        `Content-Transfer-Encoding: base64\r\n\r\n` +
+        base64Data + `\r\n` +
+        `--${boundary}--`;
+      await driveApiFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body,
+      });
+    } catch (err) { console.error('drive file upload failed', fname, err); }
+  }
+}
+
+async function importMissingDriveFiles(data) {
+  if (!driveFilesFolderId) return;
+  for (const score of (data.scores || [])) {
+    if (!score.image_file_id) continue;
+    const existing = await idbGet('files', score.image_file_id).catch(() => null);
+    if (existing) continue;
+    const fname = fileNameFor(score.image_file_id, score.image_type);
+    try {
+      const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
+      const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+      const listData = await listRes.json();
+      if (!listData.files || listData.files.length === 0) { console.error('missing drive file', fname); continue; }
+      const fileId = listData.files[0].id;
+      const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      const blob = await contentRes.blob();
+      await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
+    } catch (err) { console.error('missing drive file', fname, err); }
+  }
+  fileUrlCache.clear();
 }
 
 document.getElementById('drive-connect-btn').addEventListener('click', async () => {
@@ -1942,7 +2080,7 @@ document.getElementById('drive-connect-btn').addEventListener('click', async () 
   if (!ok) return;
   setDriveStatus('接続中の処理をしています…');
   try {
-    await findOrCreateDriveFile();
+    await findOrCreateDriveStructure();
     driveLastModified = null;
     await saveDriveMeta();
     refreshDriveUI();
@@ -1981,6 +2119,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
         const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
         const data = await contentRes.json();
         await applyImportedData(data);
+        await importMissingDriveFiles(data);
         driveLastModified = remoteModified;
         await saveDriveMeta();
         setDriveStatus('Google Driveの内容を取り込みました：' + new Date().toLocaleTimeString());
@@ -1988,6 +2127,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       }
     }
 
+    await pushDriveFiles();
     const data = await buildExportData();
     await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
       method: 'PATCH',
