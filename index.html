@@ -63,6 +63,8 @@
     width: 32px; height: 32px; border: none; background: none; cursor: pointer; padding: 0;
   }
   #menu-btn span { display: block; width: 20px; height: 2px; background: var(--text); margin: 0 auto; }
+  @keyframes sync-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  #sync-now-header-btn.syncing { display: inline-block; animation: sync-spin 0.9s linear infinite; color: var(--accent) !important; }
   .menu-dropdown {
     display: none; position: absolute; top: 40px; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -329,7 +331,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.011</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.012</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -1655,10 +1657,8 @@ syncHeaderBtn.addEventListener('click', async () => {
     alert('先に「設定」画面で同期先を設定してください');
     return;
   }
-  syncHeaderBtn.style.opacity = '0.4';
   if (syncHandle) await performSync({ manual: true });
   if (driveFileId) await performDriveSync({ manual: true });
-  syncHeaderBtn.style.opacity = '1';
 });
 
 // ---- 自動同期の間隔設定 ----
@@ -1756,9 +1756,21 @@ async function applyImportedData(data) {
   renderResults();
 }
 
+// ---- 同期中インジケータ（ヘッダーアイコンの回転） ----
+let syncSpinCount = 0;
+function startSyncSpin() {
+  syncSpinCount++;
+  syncHeaderBtn.classList.add('syncing');
+}
+function stopSyncSpin() {
+  syncSpinCount = Math.max(0, syncSpinCount - 1);
+  if (syncSpinCount === 0) syncHeaderBtn.classList.remove('syncing');
+}
+
 async function performSync({ forceWrite = false, manual = false } = {}) {
   if (!syncHandle || syncInProgress) return;
   syncInProgress = true;
+  startSyncSpin();
   try {
     const ok = await ensureSyncPermission();
     if (!ok) {
@@ -1799,6 +1811,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     if (manual) alert('同期に失敗しました：' + err.message);
   } finally {
     syncInProgress = false;
+    stopSyncSpin();
   }
 }
 
@@ -1944,6 +1957,7 @@ document.getElementById('drive-sync-now-btn').addEventListener('click', () => pe
 async function performDriveSync({ forceWrite = false, manual = false } = {}) {
   if (!driveFileId || driveSyncInProgress) return;
   driveSyncInProgress = true;
+  startSyncSpin();
   try {
     if (!driveAccessToken) {
       const ok = await requestDriveToken({ silent: true });
@@ -1991,6 +2005,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     if (manual) alert('同期に失敗しました：' + err.message);
   } finally {
     driveSyncInProgress = false;
+    stopSyncSpin();
   }
 }
 
