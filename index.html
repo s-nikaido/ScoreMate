@@ -199,7 +199,8 @@
         <input type="file" id="photo-file" accept="image/*,application/pdf" multiple>
       </label>
       <button type="button" id="correct-skew-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text); font-size:13px; cursor:pointer; display:none;">📐 傾き・歪みを補正する</button>
-      <button type="button" id="ai-read-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">AIで読み取る（曲名・作曲家・パート）</button>
+      <button type="button" id="ai-read-btn" style="width:100%; margin-bottom:6px; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">AIで読み取る（曲名・作曲家・パート）</button>
+      <p style="font-size:11px; color:var(--text-muted); margin:0 0 10px;">任意機能です。無料枠のAPIキー利用時は、送信した画像がGoogle側の品質改善に使われることがあります（詳しくは設定画面）。</p>
       <div class="hint" id="ai-read-status" style="display:none;"></div>
 
       <div class="field">
@@ -272,6 +273,7 @@
         <label>Gemini APIキー</label>
         <input type="password" id="gemini-api-key" autocomplete="off">
         <div class="hint">この端末にのみ保存されます。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>で無料で取得できます。</div>
+        <div class="hint" style="background:none; border:1px solid var(--border); color:var(--text-secondary);">AI読み取りは任意機能です。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる方は機能を使わないか、有料キーをご利用ください。</div>
       </div>
       <div class="field">
         <label>モデル名</label>
@@ -296,7 +298,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.004</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.005</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
