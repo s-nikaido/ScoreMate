@@ -350,7 +350,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.026</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.027</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -830,44 +830,70 @@ const performanceNameInput = document.getElementById('performance-name');
 const performanceDateInput = document.getElementById('performance-date');
 setupAutocomplete(performanceNameInput, document.getElementById('concert-suggest'), () => db.concerts.map(c => c.name));
 let editingScoreId = null;
+let pendingPerformances = []; // 新規登録時、保存前に仮登録する演奏会（{concertName, concertDate}）
 
 function renderPerformanceList(scoreId) {
-  const performances = performancesForScore(scoreId);
   performanceListEl.innerHTML = '';
-  if (performances.length === 0) {
-    performanceListEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">まだ演奏会が登録されていません</div>';
-    return;
-  }
-  performances.forEach(p => {
-    const concert = concertById(p.concert_id);
-    const item = document.createElement('div');
-    item.className = 'performance-item';
-    item.innerHTML = `
-      <span>${escapeHtml(concert?.name || '(不明な演奏会)')}${concert?.concert_date ? `<span class="date">${escapeHtml(concert.concert_date)}</span>` : ''}</span>
-      <button type="button">削除</button>
-    `;
-    item.querySelector('button').addEventListener('click', async () => {
-      await deletePerformance(p.id);
-      renderPerformanceList(scoreId);
-      renderResults();
-      scheduleSync();
+  if (scoreId) {
+    // 編集時：DBに保存済みの演奏会履歴を表示
+    const performances = performancesForScore(scoreId);
+    if (performances.length === 0) {
+      performanceListEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">まだ演奏会が登録されていません</div>';
+      return;
+    }
+    performances.forEach(p => {
+      const concert = concertById(p.concert_id);
+      const item = document.createElement('div');
+      item.className = 'performance-item';
+      item.innerHTML = `
+        <span>${escapeHtml(concert?.name || '(不明な演奏会)')}${concert?.concert_date ? `<span class="date">${escapeHtml(concert.concert_date)}</span>` : ''}</span>
+        <button type="button">削除</button>
+      `;
+      item.querySelector('button').addEventListener('click', async () => {
+        await deletePerformance(p.id);
+        renderPerformanceList(scoreId);
+        renderResults();
+        scheduleSync();
+      });
+      performanceListEl.appendChild(item);
     });
-    performanceListEl.appendChild(item);
-  });
+  } else {
+    // 新規登録時：保存前の仮の演奏会リストを表示
+    if (pendingPerformances.length === 0) {
+      performanceListEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">まだ演奏会が追加されていません（保存時に登録されます）</div>';
+      return;
+    }
+    pendingPerformances.forEach((p, index) => {
+      const item = document.createElement('div');
+      item.className = 'performance-item';
+      item.innerHTML = `
+        <span>${escapeHtml(p.concertName)}${p.concertDate ? `<span class="date">${escapeHtml(p.concertDate)}</span>` : ''}</span>
+        <button type="button">削除</button>
+      `;
+      item.querySelector('button').addEventListener('click', () => {
+        pendingPerformances.splice(index, 1);
+        renderPerformanceList(null);
+      });
+      performanceListEl.appendChild(item);
+    });
+  }
 }
 document.getElementById('performance-add-btn').addEventListener('click', async () => {
-  if (!editingScoreId) return;
   const name = performanceNameInput.value.trim();
   if (!name) { performanceNameInput.focus(); return; }
-  await addPerformance({ scoreId: editingScoreId, concertName: name, concertDate: performanceDateInput.value });
+  const concertDate = performanceDateInput.value;
+  if (editingScoreId) {
+    await addPerformance({ scoreId: editingScoreId, concertName: name, concertDate });
+    renderPerformanceList(editingScoreId);
+    renderResults();
+    scheduleSync();
+  } else {
+    pendingPerformances.push({ concertName: name, concertDate });
+    renderPerformanceList(null);
+  }
   performanceNameInput.value = '';
   performanceDateInput.value = '';
-  renderPerformanceList(editingScoreId);
-  renderConcertOptionsRefresh();
-  renderResults();
-  scheduleSync();
 });
-function renderConcertOptionsRefresh() { /* db.concerts を直接参照するオートコンプリートなので不要 */ }
 
 function startEditScore(scoreId) {
   const score = db.scores.find(s => s.id === scoreId);
@@ -1271,10 +1297,12 @@ function resetForm() {
   partError.style.display = 'none';
   titleError.style.display = 'none';
   editingScoreId = null;
+  pendingPerformances = [];
   saveBtn.textContent = '保存';
-  performanceSection.style.display = 'none';
+  performanceSection.style.display = 'block';
   performanceNameInput.value = '';
   performanceDateInput.value = '';
+  renderPerformanceList(null);
   aiReadStatus.style.display = 'none';
 }
 
@@ -1307,7 +1335,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       await updateScore(editingScoreId, { partName: fPart.value, memo: fMemo.value, imageFileId, imageType });
     } else {
       const work = await addOrGetWork({ title: fTitle.value, composer: fComposer.value });
-      await addScore({ workId: work.id, partName: fPart.value, memo: fMemo.value, imageFileId, imageType });
+      const newScore = await addScore({ workId: work.id, partName: fPart.value, memo: fMemo.value, imageFileId, imageType });
+      for (const p of pendingPerformances) {
+        await addPerformance({ scoreId: newScore.id, concertName: p.concertName, concertDate: p.concertDate });
+      }
     }
     resetForm();
     showView('search');
