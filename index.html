@@ -175,8 +175,8 @@
           <button type="button" data-view="parts">パート</button>
           <div class="menu-divider"></div>
           <button type="button" data-view="settings">設定</button>
-          <button type="button" id="export-btn">書き出し（バックアップ）</button>
-          <button type="button" id="import-btn">読み込み（復元）</button>
+          <button type="button" id="export-btn">エクスポート（バックアップ）</button>
+          <button type="button" id="import-btn">インポート（復元）</button>
           <input type="file" id="import-file-input" accept="application/json" style="display:none;">
         </div>
       </div>
@@ -243,6 +243,7 @@
         </div>
       </div>
       <button class="primary" id="save-btn">保存</button>
+      <button type="button" id="cancel-btn" style="width:100%; margin-top:8px; padding:11px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text-secondary); font-size:14px; cursor:pointer;">キャンセル</button>
     </section>
 
     <section id="view-concerts" class="view">
@@ -271,6 +272,7 @@
     </section>
 
     <section id="view-settings" class="view">
+      <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 12px;">AI読み取り</p>
       <div class="field">
         <label>Gemini APIキー</label>
         <input type="password" id="gemini-api-key" autocomplete="off">
@@ -278,7 +280,7 @@
         <div class="hint" style="background:none; border:1px solid var(--border); color:var(--text-secondary);">AI読み取りは任意機能です。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる方は機能を使わないか、有料キーをご利用ください。</div>
       </div>
       <div class="field">
-        <label>モデル名</label>
+        <label>AIモデル</label>
         <select id="gemini-model-name">
           <option value="gemini-3.5-flash">gemini-3.5-flash</option>
         </select>
@@ -288,37 +290,39 @@
       <button class="primary" id="gemini-settings-save-btn">保存</button>
 
       <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:16px;">
-        <label>データの保管方法</label>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 4px;">データの自動保存</p>
+        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">変更するたびに、決めた場所へ自動でバックアップします。</p>
         <div class="chip-row" id="sync-category-chips" style="margin-bottom:12px;">
-          <span class="chip" data-category="local">ローカル</span>
-          <span class="chip" data-category="cloud">同期</span>
+          <span class="chip" data-category="local">フォルダに保存</span>
+          <span class="chip" data-category="cloud">クラウドに保存</span>
         </div>
 
         <div id="sync-category-local">
           <p id="sync-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未設定</p>
-          <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">同期フォルダを選択</button>
-          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">選択したフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。</p>
-          <button type="button" id="sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ同期</button>
+          <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">保存先フォルダを選ぶ</button>
+          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">選んだフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。</p>
+          <button type="button" id="sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ保存する</button>
         </div>
 
         <div id="sync-category-cloud">
-          <label>同期先</label>
-          <select id="cloud-provider-select" style="margin-bottom:12px;">
+          <label>保存先のクラウド</label>
+          <select id="cloud-provider-select" style="margin-bottom:4px;">
             <option value="google-drive">Google Drive</option>
           </select>
+          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">PC向けの実験的な機能です。</p>
           <p id="drive-mobile-note" style="font-size:12px; color:var(--text-muted); display:none;">スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。</p>
           <div id="drive-pc-ui">
             <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
-            <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveに接続</button>
-            <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐGoogle Driveと同期</button>
+            <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveにつなぐ</button>
+            <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐ保存する</button>
           </div>
         </div>
       </div>
 
       <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px;">
-        <label>自動同期の間隔（両方式共通）</label>
+        <label>自動保存の頻度</label>
         <select id="sync-interval-select">
-          <option value="0">変更時のみ（定期同期しない）</option>
+          <option value="0">変更時のみ（定期保存しない）</option>
           <option value="5">5分ごと</option>
           <option value="15" selected>15分ごと</option>
           <option value="30">30分ごと</option>
@@ -328,7 +332,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.014</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.018</footer>
 </div>
 
 <div class="modal-overlay" id="image-modal">
@@ -1286,6 +1290,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     saveBtn.disabled = false;
   }
 });
+document.getElementById('cancel-btn').addEventListener('click', () => {
+  resetForm();
+  showView('search');
+});
 
 // ================== 演奏会・作曲家・パートのマスタ管理 ==================
 function renderSimpleMasterList(containerEl, table, master, countFn) {
@@ -1526,7 +1534,7 @@ aiReadBtn.addEventListener('click', async () => {
   }
 });
 
-// ================== 書き出し・読み込み（クラウドドライブ経由の手動同期） ==================
+// ================== エクスポート・インポート（クラウドドライブ経由の手動同期） ==================
 function extForMime(mime) {
   if (!mime) return 'bin';
   if (mime === 'application/pdf') return 'pdf';
@@ -1581,11 +1589,9 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   if (!file) return;
   const text = await file.text();
   const data = JSON.parse(text);
-  if (db.works.length > 0 || db.scores.length > 0) {
-    const proceed = confirm('現在の端末にすでにデータがあります。読み込んだデータで上書きしますか？（現在のデータは削除されます）');
-    if (!proceed) { e.target.value = ''; return; }
-  }
-  for (const store of STORES) {
+  const proceed = confirm('インポートすると、現在のデータはすべて削除され、このファイルの内容に置き換わります。この操作は取り消せません。実行しますか？');
+  if (!proceed) { e.target.value = ''; return; }
+  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files']) {
     const all = await idbGetAll(store);
     for (const item of all) await idbDelete(store, item.id);
   }
@@ -1598,7 +1604,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   fileUrlCache.clear();
   await loadData();
   renderResults();
-  alert('読み込みが完了しました');
+  alert('インポートが完了しました');
   scheduleSync();
   e.target.value = '';
 });
@@ -1658,7 +1664,7 @@ function refreshSyncUI() {
   const setupBtn = document.getElementById('sync-setup-btn');
   const nowBtn = document.getElementById('sync-now-btn');
   if (!supportsFSA) {
-    setSyncStatus('このブラウザは自動同期に対応していません（メニューの書き出し/読み込みをご利用ください）');
+    setSyncStatus('このブラウザは自動同期に対応していません（メニューのエクスポート/インポートをご利用ください）');
     setupBtn.style.display = 'none';
     nowBtn.style.display = 'none';
     return;
@@ -1822,7 +1828,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
   try {
     const ok = await ensureSyncPermission();
     if (!ok) {
-      setSyncStatus('同期には許可が必要です。「今すぐ同期」を押してください');
+      setSyncStatus('保存には許可が必要です。「今すぐ保存する」を押してください');
       return;
     }
 
@@ -2100,7 +2106,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     if (!driveAccessToken) {
       const ok = await requestDriveToken({ silent: true });
       if (!ok) {
-        setDriveStatus('接続の更新が必要です。「Google Driveに接続」を押してください');
+        setDriveStatus('接続の更新が必要です。「Google Driveにつなぐ」を押してください');
         return;
       }
     }
