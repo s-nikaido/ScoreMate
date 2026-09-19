@@ -18,12 +18,13 @@
     --accent-bg: #F0E0D0;
     --danger: #A83B2B;
     --radius: 6px;
+    --font-body: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
     --font-serif: Georgia, "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body {
-    font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-family: var(--font-body);
     background: var(--bg);
     color: var(--text);
   }
@@ -221,24 +222,24 @@
       </label>
       <button type="button" id="correct-skew-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text); font-size:13px; cursor:pointer; display:none;">📐 傾き・歪みを補正する</button>
       <button type="button" id="ai-read-btn" style="width:100%; margin-bottom:6px; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">AIで読み取る（曲名・作曲家・パート）</button>
-      <p style="font-size:11px; color:var(--text-muted); margin:0 0 10px;">任意機能です。無料枠のAPIキー利用時は、送信した画像がGoogle側の品質改善に使われることがあります（詳しくは設定画面）。</p>
+      <p id="ai-read-note" style="font-size:11px; color:var(--text-muted); margin:0 0 10px;">任意機能です。無料枠のAPIキー利用時は、送信した画像がGoogle側の品質改善に使われることがあります（詳しくは設定画面）。</p>
       <div class="hint" id="ai-read-status" style="display:none;"></div>
 
       <div class="field">
-        <label>曲名 *</label>
+        <label id="label-title">曲名 *</label>
         <input type="text" id="f-title">
         <div class="error" id="title-error" style="display:none">曲名を入力してください</div>
         <div class="hint" id="match-hint" style="display:none"></div>
       </div>
       <div class="field">
-        <label>作曲家</label>
+        <label id="label-composer">作曲家</label>
         <div class="autocomplete-wrap">
           <input type="text" id="f-composer" autocomplete="off">
           <div class="autocomplete-list" id="composer-suggest"></div>
         </div>
       </div>
       <div class="field" style="border-top:1px solid var(--border); padding-top:12px;">
-        <label>パート名</label>
+        <label id="label-part">パート名</label>
         <div class="autocomplete-wrap">
           <input type="text" id="f-part" autocomplete="off">
           <div class="autocomplete-list" id="part-suggest"></div>
@@ -246,11 +247,11 @@
         <div class="error" id="part-error" style="display:none">パート名を入力してください</div>
       </div>
       <div class="field">
-        <label>メモ</label>
+        <label id="label-memo">メモ</label>
         <textarea id="f-memo" rows="3"></textarea>
       </div>
       <div class="field" id="performance-section" style="display:none; border-top:1px solid var(--border); padding-top:12px;">
-        <label>演奏会履歴</label>
+        <label id="label-performance-history">演奏会履歴</label>
         <div id="performance-list"></div>
         <div style="display:flex; gap:6px; margin-top:8px;">
           <div class="autocomplete-wrap" style="flex:2;">
@@ -291,15 +292,37 @@
     </section>
 
     <section id="view-settings" class="view">
-      <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 12px;">AI読み取り</p>
+      <p id="settings-display-heading" style="font-family:var(--font-serif); font-size:16px; margin:0 0 4px;">表示設定</p>
       <div class="field">
-        <label>Gemini APIキー</label>
-        <input type="password" id="gemini-api-key" autocomplete="off">
-        <div class="hint">この端末にのみ保存されます。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>で無料で取得できます。</div>
-        <div class="hint" style="background:none; border:1px solid var(--border); color:var(--text-secondary);">AI読み取りは任意機能です。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる方は機能を使わないか、有料キーをご利用ください。</div>
+        <label>Language / 言語</label>
+        <select id="language-select" style="margin-bottom:8px;">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
       </div>
       <div class="field">
-        <label>AIモデル</label>
+        <label id="settings-font-label">フォント</label>
+        <select id="font-preset-select" style="margin-bottom:8px;">
+          <option id="font-option-a" value="A">A：紙質・クラシック（既定）</option>
+          <option id="font-option-b" value="B">B：すっきり・現代的</option>
+          <option id="font-option-c" value="C">C：上品・エディトリアル</option>
+          <option id="font-option-custom" value="custom">カスタム（フォント名を直接指定）</option>
+        </select>
+        <div id="font-custom-field" style="display:none;">
+          <input type="text" id="font-custom-input" placeholder="例：Noto Sans JP" style="margin-bottom:4px;">
+          <div class="hint" id="font-custom-hint">端末にこのフォントが無い場合は、自動的に標準フォントで表示されます。</div>
+        </div>
+      </div>
+
+      <p id="settings-ai-heading" style="font-family:var(--font-serif); font-size:16px; margin:16px 0 12px; border-top:1px solid var(--border); padding-top:16px;">AI読み取り</p>
+      <div class="field">
+        <label id="label-gemini-key">Gemini APIキー</label>
+        <input type="password" id="gemini-api-key" autocomplete="off">
+        <div class="hint" id="gemini-key-hint">この端末にのみ保存されます。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>で無料で取得できます。</div>
+        <div class="hint" id="gemini-key-privacy-hint" style="background:none; border:1px solid var(--border); color:var(--text-secondary);">AI読み取りは任意機能です。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる方は機能を使わないか、有料キーをご利用ください。</div>
+      </div>
+      <div class="field">
+        <label id="label-ai-model">AIモデル</label>
         <select id="gemini-model-name">
           <option value="gemini-3.5-flash">gemini-3.5-flash</option>
         </select>
@@ -309,26 +332,26 @@
       <button class="primary" id="gemini-settings-save-btn">保存</button>
 
       <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:16px;">
-        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 4px;">データの自動保存</p>
-        <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">変更するたびに、決めた場所へ自動でバックアップします。</p>
+        <p id="settings-autosave-heading" style="font-family:var(--font-serif); font-size:16px; margin:0 0 4px;">データの自動保存</p>
+        <p id="settings-autosave-desc" style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">変更するたびに、決めた場所へ自動でバックアップします。</p>
         <div class="chip-row" id="sync-category-chips" style="margin-bottom:12px;">
-          <span class="chip" data-category="local">フォルダに保存</span>
-          <span class="chip" data-category="cloud">クラウドに保存</span>
+          <span class="chip" data-category="local" id="sync-chip-local">フォルダに保存</span>
+          <span class="chip" data-category="cloud" id="sync-chip-cloud">クラウドに保存</span>
         </div>
 
         <div id="sync-category-local">
           <p id="sync-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未設定</p>
           <button type="button" id="sync-setup-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">保存先フォルダを選ぶ</button>
-          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">選んだフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。</p>
+          <p id="sync-folder-hint" style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">選んだフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。</p>
           <button type="button" id="sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">今すぐ保存する</button>
         </div>
 
         <div id="sync-category-cloud">
-          <label>保存先のクラウド</label>
+          <label id="label-cloud-provider">保存先のクラウド</label>
           <select id="cloud-provider-select" style="margin-bottom:4px;">
             <option value="google-drive">Google Drive</option>
           </select>
-          <p style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">PC向けの実験的な機能です。</p>
+          <p id="drive-experimental-note" style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">PC向けの実験的な機能です。</p>
           <p id="drive-mobile-note" style="font-size:12px; color:var(--text-muted); display:none;">スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。</p>
           <div id="drive-pc-ui">
             <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
@@ -340,32 +363,32 @@
       </div>
 
       <div class="field" style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px;">
-        <label>自動保存の頻度</label>
+        <label id="label-sync-interval">自動保存の頻度</label>
         <select id="sync-interval-select">
-          <option value="0">変更時のみ（定期保存しない）</option>
-          <option value="5">5分ごと</option>
-          <option value="15" selected>15分ごと</option>
-          <option value="30">30分ごと</option>
-          <option value="60">1時間ごと</option>
+          <option id="interval-option-0" value="0">変更時のみ（定期保存しない）</option>
+          <option id="interval-option-5" value="5">5分ごと</option>
+          <option id="interval-option-15" value="15" selected>15分ごと</option>
+          <option id="interval-option-30" value="30">30分ごと</option>
+          <option id="interval-option-60" value="60">1時間ごと</option>
         </select>
       </div>
     </section>
 
     <section id="view-unused-files" class="view">
-      <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">どの楽譜からも参照されなくなった画像・PDFです。削除しても登録済みの楽譜には影響しません。</p>
+      <p id="unused-files-desc" style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">どの楽譜からも参照されなくなった画像・PDFです。削除しても登録済みの楽譜には影響しません。</p>
       <button type="button" id="unused-files-refresh-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">一覧を更新</button>
       <button type="button" id="unused-files-delete-all-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--danger); border-radius:var(--radius); background:none; color:var(--danger); font-size:13px; cursor:pointer;">すべて削除</button>
       <div id="unused-files-list"></div>
     </section>
 
     <section id="view-sync-history" class="view">
-      <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">同期のたびに、直前の状態を自動でバックアップしています（最新20件）。不測の事態が起きたときは、ここから復元できます。</p>
+      <p id="sync-history-desc" style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">同期のたびに、直前の状態を自動でバックアップしています（最新20件）。不測の事態が起きたときは、ここから復元できます。</p>
       <button type="button" id="sync-history-refresh-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">履歴を読み込む</button>
       <div id="sync-history-list"></div>
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.035</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.040</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -393,6 +416,214 @@
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
+// ================== 多言語対応（i18n） ==================
+const I18N = {
+  ja: {
+    menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
+    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴',
+    menu_export: 'エクスポート（バックアップ）', menu_import: 'インポート（復元）',
+    search_placeholder: '検索',
+    filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
+    label_title: '曲名 *', label_composer: '作曲家', label_part: 'パート名', label_memo: 'メモ',
+    label_performance_history: '演奏会履歴', placeholder_concert_name: '演奏会名',
+    btn_ai_read: 'AIで読み取る（曲名・作曲家・パート）', btn_correct_skew: '📐 傾き・歪みを補正する',
+    btn_save: '保存', btn_update: '更新', btn_cancel: 'キャンセル', btn_add: '追加', btn_delete: '削除', btn_edit: '編集', btn_back: '← 戻る',
+    placeholder_composer_name: '作曲家名', placeholder_part_name: 'パート名',
+    settings_display: '表示設定', settings_font: 'フォント', settings_ai_read: 'AI読み取り',
+    font_option_a: 'A：紙質・クラシック（既定）', font_option_b: 'B：すっきり・現代的',
+    font_option_c: 'C：上品・エディトリアル', font_option_custom: 'カスタム（フォント名を直接指定）',
+    font_custom_placeholder: '例：Noto Sans JP', font_custom_hint: '端末にこのフォントが無い場合は、自動的に標準フォントで表示されます。',
+    settings_gemini_key: 'Gemini APIキー', settings_ai_model: 'AIモデル',
+    empty_no_scores: '登録された楽譜がありません', empty_no_matches: '該当する楽譜がありません', empty_no_data: '該当するデータがありません',
+    unset_composer: '作曲家未設定', unset_part: 'パート未設定',
+    aria_menu: 'メニュー', aria_sync_now: '今すぐ同期',
+    photo_placeholder: '写真を撮影 / アップロード',
+    error_title_required: '曲名を入力してください', error_part_required: 'パート名を入力してください',
+    ai_read_note: '任意機能です。無料枠のAPIキー利用時は、送信した画像がGoogle側の品質改善に使われることがあります（詳しくは設定画面）。',
+    gemini_key_hint_prefix: 'この端末にのみ保存されます。', gemini_key_hint_link: 'Google AI Studio', gemini_key_hint_suffix: 'で無料で取得できます。',
+    gemini_key_privacy_hint: 'AI読み取りは任意機能です。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる方は機能を使わないか、有料キーをご利用ください。',
+    btn_fetch_models: '利用可能なモデルを取得',
+    settings_autosave: 'データの自動保存', settings_autosave_desc: '変更するたびに、決めた場所へ自動でバックアップします。',
+    sync_chip_local: 'フォルダに保存', sync_chip_cloud: 'クラウドに保存',
+    sync_status_unset: '未設定', btn_choose_folder: '保存先フォルダを選ぶ',
+    sync_folder_hint: '選んだフォルダの中に「ScoreMate」フォルダが自動的に作成され、そこにデータ・画像・PDFが保存されます。',
+    btn_sync_now: '今すぐ保存する',
+    label_cloud_provider: '保存先のクラウド', drive_experimental_note: 'PC向けの実験的な機能です。',
+    drive_mobile_note: 'スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。',
+    drive_status_disconnected: '未接続', btn_connect_drive: 'Google Driveにつなぐ',
+    drive_popup_hint: 'つながらない場合は、iPhoneの「設定」→「Safari」→「ポップアップブロック」をオフにしてから、もう一度お試しください。',
+    label_sync_interval: '自動保存の頻度',
+    interval_0: '変更時のみ（定期保存しない）', interval_5: '5分ごと', interval_15: '15分ごと', interval_30: '30分ごと', interval_60: '1時間ごと',
+    unused_files_desc: 'どの楽譜からも参照されなくなった画像・PDFです。削除しても登録済みの楽譜には影響しません。',
+    btn_refresh_list: '一覧を更新', btn_delete_all: 'すべて削除',
+    sync_history_desc: '同期のたびに、直前の状態を自動でバックアップしています（最新20件）。不測の事態が起きたときは、ここから復元できます。',
+    btn_load_history: '履歴を読み込む',
+    sync_center_syncing: '更新中…',
+    sync_unsupported_browser: 'このブラウザは自動同期に対応していません（メニューのエクスポート/インポートをご利用ください）',
+    sync_configured: '設定済み：「{name}」フォルダ内で同期中',
+    sync_not_set_hint: '未設定（Google Driveなどの同期フォルダ内にファイルを1つ選んでください）',
+    drive_permission_pending: 'この機能は現在準備中です',
+    drive_connected: '接続済み：「{name}」フォルダ内で同期中',
+    drive_mobile_experimental: 'スマートフォンでは実験的な対応です。うまく動かない場合はPCのブラウザをお試しください。',
+    used_count_suffix: '・ {count}件で使用中',
+    empty_no_master_data: '登録されたデータがありません',
+    empty_no_concerts: '登録された演奏会がありません',
+    confirm_delete_used: 'このデータは{count}件で使用されています。削除すると紐付けが解除されます（楽曲・楽譜自体は削除されません）。削除しますか？',
+    confirm_delete_simple: '削除しますか？',
+    confirm_delete_concert_used: 'この演奏会は{count}件の楽譜に紐付いています。削除するとその紐付けも消えます。削除しますか？',
+    confirm_delete_concert_simple: 'この演奏会を削除しますか？',
+    confirm_delete_score: 'この楽譜を削除しますか？',
+    confirm_import: 'インポートすると、現在のデータはすべて削除され、このファイルの内容に置き換わります。この操作は取り消せません。実行しますか？',
+    alert_import_done: 'インポートが完了しました',
+    alert_need_api_key: '先にAPIキーを入力してください',
+    alert_fetch_failed: '取得に失敗しました：',
+    alert_saved: '保存しました',
+    alert_need_gemini_key_settings: '先に「設定」画面でGemini APIキーを保存してください',
+    alert_select_photo_first: '写真またはPDFを選択してから読み取ってください（複数枚選んでいる場合は1枚目のみ読み取ります）',
+    alert_need_sync_target: '先に「設定」画面で同期先を設定してください',
+    alert_setup_failed: '設定に失敗しました：',
+    alert_sync_failed: '同期に失敗しました：',
+    alert_feature_not_ready: 'この機能は現在準備中です',
+    alert_google_auth_load_failed: 'Googleの認証ライブラリの読み込みに失敗しました。少し待ってからお試しください。',
+    confirm_delete_unused_file: 'このファイルを削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。',
+    alert_no_unused_files: '未使用のファイルはありません',
+    confirm_delete_all_unused: '{count}件の未使用ファイルをすべて削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。',
+    confirm_restore_history: 'この時点の内容に復元します。現在のデータは、この内容で置き換わります。実行しますか？',
+    alert_restore_done: '復元しました',
+    alert_restore_failed: '復元に失敗しました：',
+    no_performances_yet: 'まだ演奏会が追加されていません（保存時に登録されます）',
+    selected_images_status: '{count}枚の画像を選択しました（保存時に1つのPDFにまとめます）',
+    saving_status: '保存中…',
+    converting_pdf_status: 'PDFに変換中…',
+    ai_reading_status: '読み取り中…',
+    ai_read_filled: '読み取りました（{fields}）。内容を確認・修正してください。',
+    ai_read_no_new_fields: '読み取れましたが、既に入力済みの項目は上書きしていません。',
+    ai_read_failed: '読み取りに失敗しました：',
+    drive_connect_failed: '接続に失敗しました：',
+    drive_no_response: '応答がありませんでした（ポップアップがブロックされていないか確認してください）',
+    drive_connecting: '接続中の処理をしています…',
+    drive_reauth_needed: '接続の更新が必要です。「Google Driveにつなぐ」を押してください',
+    sync_permission_needed: '保存には許可が必要です。「今すぐ保存する」を押してください',
+    sync_other_device_syncing: '他の端末が同期中のようです。しばらくしてからもう一度お試しください',
+    sync_pulled_latest: '最新の内容を取り込みました：',
+    sync_done: '同期済み：',
+    loading_status: '読み込み中…',
+    no_history_yet: 'まだ履歴がありません（同期を設定していない、またはまだ一度も同期していない場合は履歴がありません）',
+    source_folder: 'フォルダ', btn_restore_this: 'この内容に戻す',
+    pdf_selected_status: 'PDFを選択しました：',
+    skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
+    skew_detect_failed: '自動検出できませんでした。点をドラッグして合わせてください',
+    fetching_status: '取得中…',
+  },
+  en: {
+    menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
+    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History',
+    menu_export: 'Export (Backup)', menu_import: 'Import (Restore)',
+    search_placeholder: 'Search',
+    filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
+    label_title: 'Title *', label_composer: 'Composer', label_part: 'Part', label_memo: 'Notes',
+    label_performance_history: 'Performance History', placeholder_concert_name: 'Concert name',
+    btn_ai_read: 'Read with AI (Title, Composer, Part)', btn_correct_skew: '📐 Correct Skew & Distortion',
+    btn_save: 'Save', btn_update: 'Update', btn_cancel: 'Cancel', btn_add: 'Add', btn_delete: 'Delete', btn_edit: 'Edit', btn_back: '← Back',
+    placeholder_composer_name: 'Composer name', placeholder_part_name: 'Part name',
+    settings_display: 'Display Settings', settings_font: 'Font', settings_ai_read: 'AI Reading',
+    font_option_a: 'A: Paper & Classic (Default)', font_option_b: 'B: Clean & Modern',
+    font_option_c: 'C: Elegant & Editorial', font_option_custom: 'Custom (enter a font name)',
+    font_custom_placeholder: 'e.g. Noto Sans JP', font_custom_hint: 'If this font isn\'t available on your device, the standard font will be used automatically.',
+    settings_gemini_key: 'Gemini API Key', settings_ai_model: 'AI Model',
+    empty_no_scores: 'No scores registered', empty_no_matches: 'No matching scores', empty_no_data: 'No matching data',
+    unset_composer: 'Composer not set', unset_part: 'Part not set',
+    aria_menu: 'Menu', aria_sync_now: 'Sync now',
+    photo_placeholder: 'Take a photo / Upload',
+    error_title_required: 'Please enter a title', error_part_required: 'Please enter a part name',
+    ai_read_note: 'This is optional. If you use a free-tier API key, the images you send may be used by Google to improve its products (see Settings for details).',
+    gemini_key_hint_prefix: 'Stored on this device only. Get one for free at ', gemini_key_hint_link: 'Google AI Studio', gemini_key_hint_suffix: '.',
+    gemini_key_privacy_hint: 'AI reading is optional. If you use a free-tier API key, the images you send may be used by Google to improve its products. If this concerns you, don\'t use the feature, or use a paid key instead.',
+    btn_fetch_models: 'Fetch Available Models',
+    settings_autosave: 'Automatic Backup', settings_autosave_desc: 'Automatically backs up to the location you choose whenever you make a change.',
+    sync_chip_local: 'Save to Folder', sync_chip_cloud: 'Save to Cloud',
+    sync_status_unset: 'Not set', btn_choose_folder: 'Choose a Save Folder',
+    sync_folder_hint: 'A "ScoreMate" folder will be created automatically inside the folder you choose, and your data, images, and PDFs will be saved there.',
+    btn_sync_now: 'Save Now',
+    label_cloud_provider: 'Cloud Destination', drive_experimental_note: 'An experimental feature for PC.',
+    drive_mobile_note: 'Not yet supported on mobile browsers. Please use Chrome or Edge on a PC.',
+    drive_status_disconnected: 'Not connected', btn_connect_drive: 'Connect to Google Drive',
+    drive_popup_hint: 'If it won\'t connect, try turning off Pop-up Blocker in iPhone Settings → Safari, then try again.',
+    label_sync_interval: 'Auto-Save Frequency',
+    interval_0: 'Only on change (no periodic save)', interval_5: 'Every 5 minutes', interval_15: 'Every 15 minutes', interval_30: 'Every 30 minutes', interval_60: 'Every hour',
+    unused_files_desc: 'Images and PDFs no longer referenced by any score. Deleting them does not affect any registered scores.',
+    btn_refresh_list: 'Refresh List', btn_delete_all: 'Delete All',
+    sync_history_desc: 'A backup of the previous state is taken automatically before every sync (latest 20 kept). If something goes wrong, you can restore from here.',
+    btn_load_history: 'Load History',
+    sync_center_syncing: 'Syncing…',
+    sync_unsupported_browser: 'This browser doesn\'t support automatic sync (use Export/Import from the menu instead)',
+    sync_configured: 'Configured: syncing inside the "{name}" folder',
+    sync_not_set_hint: 'Not set (choose a file inside a sync folder such as Google Drive)',
+    drive_permission_pending: 'This feature is not yet available',
+    drive_connected: 'Connected: syncing inside the "{name}" folder',
+    drive_mobile_experimental: 'This is an experimental feature on mobile. If it doesn\'t work well, please try a PC browser instead.',
+    used_count_suffix: '· Used in {count}',
+    empty_no_master_data: 'No data registered',
+    empty_no_concerts: 'No concerts registered',
+    confirm_delete_used: 'This is used in {count} place(s). Deleting it will unlink those references (the works/scores themselves won\'t be deleted). Delete anyway?',
+    confirm_delete_simple: 'Delete this?',
+    confirm_delete_concert_used: 'This concert is linked to {count} score(s). Deleting it will also remove those links. Delete anyway?',
+    confirm_delete_concert_simple: 'Delete this concert?',
+    confirm_delete_score: 'Delete this score?',
+    confirm_import: 'Importing will delete all current data and replace it with the contents of this file. This cannot be undone. Continue?',
+    alert_import_done: 'Import complete',
+    alert_need_api_key: 'Please enter an API key first',
+    alert_fetch_failed: 'Fetch failed: ',
+    alert_saved: 'Saved',
+    alert_need_gemini_key_settings: 'Please save your Gemini API key in Settings first',
+    alert_select_photo_first: 'Please select a photo or PDF before reading (if multiple are selected, only the first will be read)',
+    alert_need_sync_target: 'Please set up a sync destination in Settings first',
+    alert_setup_failed: 'Setup failed: ',
+    alert_sync_failed: 'Sync failed: ',
+    alert_feature_not_ready: 'This feature is not yet available',
+    alert_google_auth_load_failed: 'Failed to load Google\'s authentication library. Please wait a moment and try again.',
+    confirm_delete_unused_file: 'Delete this file? It will also be removed from your configured destination (folder / Google Drive). This cannot be undone.',
+    alert_no_unused_files: 'There are no unused files',
+    confirm_delete_all_unused: 'Delete all {count} unused file(s)? They will also be removed from your configured destination (folder / Google Drive). This cannot be undone.',
+    confirm_restore_history: 'This will restore the data to this point in time. Your current data will be replaced. Continue?',
+    alert_restore_done: 'Restored',
+    alert_restore_failed: 'Restore failed: ',
+    no_performances_yet: 'No concerts added yet (they\'ll be saved when you save this score)',
+    selected_images_status: '{count} image(s) selected (they\'ll be combined into one PDF when saved)',
+    saving_status: 'Saving…',
+    converting_pdf_status: 'Converting to PDF…',
+    ai_reading_status: 'Reading…',
+    ai_read_filled: 'Read successfully ({fields}). Please review and correct as needed.',
+    ai_read_no_new_fields: 'Read successfully, but fields you already filled in were not overwritten.',
+    ai_read_failed: 'Reading failed: ',
+    drive_connect_failed: 'Connection failed: ',
+    drive_no_response: 'No response received (check whether a pop-up was blocked)',
+    drive_connecting: 'Connecting…',
+    drive_reauth_needed: 'Reconnection needed. Please press "Connect to Google Drive"',
+    sync_permission_needed: 'Permission is needed to save. Please press "Save Now"',
+    sync_other_device_syncing: 'Another device appears to be syncing. Please wait and try again shortly',
+    sync_pulled_latest: 'Pulled the latest content: ',
+    sync_done: 'Synced: ',
+    loading_status: 'Loading…',
+    no_history_yet: 'No history yet (this happens if sync isn\'t set up, or hasn\'t run yet)',
+    source_folder: 'Folder', btn_restore_this: 'Restore This',
+    pdf_selected_status: 'PDF selected: ',
+    skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
+    skew_detect_failed: 'Couldn\'t detect automatically. Please drag the points into place',
+    fetching_status: 'Fetching…',
+  },
+};
+function getLanguage() { return localStorage.getItem('app_language') || 'ja'; }
+function t(key) {
+  const lang = getLanguage();
+  return (I18N[lang] && I18N[lang][key]) || I18N.ja[key] || key;
+}
+function tf(key, params) {
+  let s = t(key);
+  for (const k in params) s = s.replace('{' + k + '}', params[k]);
+  return s;
+}
+
 // ================== IndexedDBラッパー ==================
 const IDB_NAME = 'scoremate';
 const IDB_VERSION = 3;
@@ -660,7 +891,7 @@ function showView(name) {
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
   if (name === 'parts') renderPartMasterList();
-  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); }
+  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); loadFontSettingsIntoForm(); loadLanguageIntoForm(); }
   if (name === 'unused-files') renderUnusedFilesList();
   if (name === 'sync-history') renderSyncHistoryList();
 }
@@ -675,10 +906,10 @@ document.querySelectorAll('.menu-dropdown button[data-view]').forEach(btn => {
   });
 });
 document.getElementById('home-title').addEventListener('click', () => {
-  activeFilter = '曲名';
+  activeFilter = 'title';
   drillDown = null;
   searchInput.value = '';
-  [...filterChipsEl.children].forEach(c => c.classList.toggle('active', c.textContent === activeFilter));
+  [...filterChipsEl.children].forEach(c => c.classList.toggle('active', c.dataset.filterKey === activeFilter));
   showView('search');
 });
 
@@ -686,22 +917,27 @@ document.getElementById('home-title').addEventListener('click', () => {
 const searchInput = document.getElementById('search-input');
 const resultsEl = document.getElementById('results');
 const filterChipsEl = document.getElementById('filter-chips');
-const FILTERS = ['曲名', '演奏会', 'パート', '作曲家'];
-let activeFilter = '曲名';
+const FILTERS = ['title', 'concert', 'part', 'composer'];
+let activeFilter = 'title';
 let drillDown = null;
 
-FILTERS.forEach(f => {
-  const chip = document.createElement('span');
-  chip.className = 'chip' + (f === activeFilter ? ' active' : '');
-  chip.textContent = f;
-  chip.addEventListener('click', () => {
-    activeFilter = f;
-    drillDown = null;
-    [...filterChipsEl.children].forEach(c => c.classList.toggle('active', c.textContent === f));
-    renderResults();
+function renderFilterChips() {
+  filterChipsEl.innerHTML = '';
+  FILTERS.forEach(f => {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (f === activeFilter ? ' active' : '');
+    chip.textContent = t('filter_' + f);
+    chip.dataset.filterKey = f;
+    chip.addEventListener('click', () => {
+      activeFilter = f;
+      drillDown = null;
+      [...filterChipsEl.children].forEach(c => c.classList.toggle('active', c.dataset.filterKey === f));
+      renderResults();
+    });
+    filterChipsEl.appendChild(chip);
   });
-  filterChipsEl.appendChild(chip);
-});
+}
+renderFilterChips();
 searchInput.addEventListener('input', renderResults);
 
 function matches(work, scores, query) {
@@ -718,7 +954,7 @@ async function appendWorkCards(filteredList) {
     header.innerHTML = `
       <div>
         <p class="title">${escapeHtml(work.title)}</p>
-        <p class="sub">${escapeHtml(composerMaster.byId(work.composer_id)?.name || '作曲家未設定')}</p>
+        <p class="sub">${escapeHtml(composerMaster.byId(work.composer_id)?.name || t('unset_composer'))}</p>
       </div>
       <span class="count">${scores.length}件</span>
     `;
@@ -739,7 +975,7 @@ async function appendWorkCards(filteredList) {
       row.innerHTML = `
         ${thumbHtml}
         <div class="info">
-          <span class="part">${escapeHtml(partMaster.byId(s.part_id)?.name || 'パート未設定')}${latestConcertNameForScore(s.id) ? `<span class="loc"> ・ 直近: ${escapeHtml(latestConcertNameForScore(s.id))}</span>` : ''}</span>
+          <span class="part">${escapeHtml(partMaster.byId(s.part_id)?.name || t('unset_part'))}${latestConcertNameForScore(s.id) ? `<span class="loc"> ・ 直近: ${escapeHtml(latestConcertNameForScore(s.id))}</span>` : ''}</span>
         </div>
         <div class="actions">
           <button class="edit" type="button">編集</button>
@@ -756,7 +992,7 @@ async function appendWorkCards(filteredList) {
       row.querySelector('.edit').addEventListener('click', (e) => { e.stopPropagation(); startEditScore(s.id); });
       row.querySelector('.delete').addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm('この楽譜を削除しますか？')) deleteScore(s.id);
+        if (confirm(t('confirm_delete_score'))) deleteScore(s.id);
       });
       list.appendChild(row);
     }
@@ -770,7 +1006,7 @@ async function appendWorkCards(filteredList) {
 function renderBackButton(onBack) {
   const back = document.createElement('button');
   back.type = 'button';
-  back.textContent = '← 戻る';
+  back.textContent = t('btn_back');
   back.style.cssText = 'border:none;background:none;color:var(--accent);font-family:var(--font-serif);font-size:14px;cursor:pointer;padding:0 0 12px;display:block;';
   back.addEventListener('click', onBack);
   resultsEl.appendChild(back);
@@ -778,16 +1014,16 @@ function renderBackButton(onBack) {
 
 function renderMasterCardList() {
   let items, countFn, subFn;
-  if (activeFilter === '演奏会') {
+  if (activeFilter === 'concert') {
     items = db.concerts; countFn = performanceCountForConcert; subFn = c => c.concert_date;
-  } else if (activeFilter === '作曲家') {
+  } else if (activeFilter === 'composer') {
     items = db.composers; countFn = id => db.works.filter(w => w.composer_id === id).length; subFn = () => null;
   } else {
     items = db.parts; countFn = id => db.scores.filter(s => s.part_id === id).length; subFn = () => null;
   }
   const query = searchInput.value.trim().toLowerCase();
   if (query) items = items.filter(item => item.name.toLowerCase().includes(query));
-  if (items.length === 0) { resultsEl.innerHTML = '<div class="empty">該当するデータがありません</div>'; return; }
+  if (items.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_data')}</div>`; return; }
   const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   sorted.forEach(item => {
     const card = document.createElement('div');
@@ -808,28 +1044,28 @@ function renderMasterCardList() {
 async function renderDrillDownList() {
   renderBackButton(() => { drillDown = null; renderResults(); });
   let filterFn;
-  if (drillDown.type === '演奏会') {
+  if (drillDown.type === 'concert') {
     filterFn = (work, scores) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id));
-  } else if (drillDown.type === '作曲家') {
+  } else if (drillDown.type === 'composer') {
     filterFn = (work) => work.composer_id === drillDown.id;
   } else {
     filterFn = (work, scores) => scores.some(s => s.part_id === drillDown.id);
   }
   const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => filterFn(work, scores));
-  if (filtered.length === 0) { resultsEl.innerHTML += '<div class="empty">該当する楽譜がありません</div>'; return; }
+  if (filtered.length === 0) { resultsEl.innerHTML += `<div class="empty">${t('empty_no_matches')}</div>`; return; }
   await appendWorkCards(filtered);
 }
 
 async function renderResults() {
   const query = searchInput.value.trim();
   resultsEl.innerHTML = '';
-  if (activeFilter === '演奏会' || activeFilter === '作曲家' || activeFilter === 'パート') {
+  if (activeFilter === 'concert' || activeFilter === 'composer' || activeFilter === 'part') {
     if (drillDown && drillDown.type === activeFilter) await renderDrillDownList();
     else renderMasterCardList();
     return;
   }
   const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => matches(work, scores, query));
-  if (filtered.length === 0) { resultsEl.innerHTML = '<div class="empty">登録された楽譜がありません</div>'; return; }
+  if (filtered.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_scores')}</div>`; return; }
   await appendWorkCards(filtered);
 }
 
@@ -902,7 +1138,7 @@ function renderPerformanceList(scoreId) {
   } else {
     // 新規登録時：保存前の仮の演奏会リストを表示
     if (pendingPerformances.length === 0) {
-      performanceListEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">まだ演奏会が追加されていません（保存時に登録されます）</div>';
+      performanceListEl.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">${t('no_performances_yet')}</div>`;
       return;
     }
     pendingPerformances.forEach((p, index) => {
@@ -970,13 +1206,13 @@ function startEditScore(scoreId) {
   } else {
     photoPreview.style.display = 'none';
     photoPlaceholder.style.display = 'block';
-    photoPlaceholder.textContent = '写真を撮影 / アップロード';
+    photoPlaceholder.textContent = t('photo_placeholder');
   }
 
   performanceSection.style.display = 'block';
   renderPerformanceList(scoreId);
 
-  saveBtn.textContent = '更新';
+  saveBtn.textContent = t('btn_update');
   showView('register');
 }
 
@@ -985,7 +1221,7 @@ fTitle.addEventListener('input', () => {
   const existing = findWorkByTitle(fTitle.value);
   if (existing) {
     matchHint.style.display = 'block';
-    matchHint.textContent = `既存の楽曲「${existing.title} / ${composerMaster.byId(existing.composer_id)?.name || '作曲家未設定'}」に追加します`;
+    matchHint.textContent = `既存の楽曲「${existing.title} / ${composerMaster.byId(existing.composer_id)?.name || t('unset_composer')}」に追加します`;
     fComposer.value = composerMaster.byId(existing.composer_id)?.name || '';
     fComposer.disabled = true;
   } else {
@@ -1013,11 +1249,11 @@ photoFile.addEventListener('change', () => {
   if (files.length > 1) {
     photoPreview.style.display = 'none';
     photoPlaceholder.style.display = 'block';
-    photoPlaceholder.textContent = `${files.length}枚の画像を選択しました（保存時に1つのPDFにまとめます）`;
+    photoPlaceholder.textContent = tf('selected_images_status', { count: files.length });
   } else if (files[0].type === 'application/pdf') {
     photoPreview.style.display = 'none';
     photoPlaceholder.style.display = 'block';
-    photoPlaceholder.textContent = 'PDFを選択しました：' + files[0].name;
+    photoPlaceholder.textContent = t('pdf_selected_status') + files[0].name;
   } else {
     photoPreview.src = URL.createObjectURL(files[0]);
     photoPreview.style.display = 'block';
@@ -1181,7 +1417,7 @@ correctSkewBtn.addEventListener('click', async () => {
     ['tl', 'tr', 'br', 'bl'].forEach(c => { skewCorners[c] = skewHandlePos(c); });
     updateSkewVisuals();
     const detectStatus = document.getElementById('skew-detect-status');
-    detectStatus.textContent = '自動検出中…';
+    detectStatus.textContent = t('skew_detecting');
     detectStatus.style.display = 'block';
     const detected = await detectPaperCorners(img);
     if (detected) {
@@ -1195,9 +1431,9 @@ correctSkewBtn.addEventListener('click', async () => {
       skewCorners.br = toDisplay(detected.br);
       skewCorners.bl = toDisplay(detected.bl);
       updateSkewVisuals();
-      detectStatus.textContent = '自動検出しました（ズレていれば指で調整してください）';
+      detectStatus.textContent = t('skew_detected');
     } else {
-      detectStatus.textContent = '自動検出できませんでした。点をドラッグして合わせてください';
+      detectStatus.textContent = t('skew_detect_failed');
     }
   });
 });
@@ -1332,7 +1568,7 @@ function resetForm() {
   matchHint.style.display = 'none';
   photoPreview.style.display = 'none';
   photoPlaceholder.style.display = 'block';
-  photoPlaceholder.textContent = '写真を撮影 / アップロード';
+  photoPlaceholder.textContent = t('photo_placeholder');
   selectedFiles = [];
   existingImageFileId = null;
   existingImageType = null;
@@ -1343,7 +1579,7 @@ function resetForm() {
   titleError.style.display = 'none';
   editingScoreId = null;
   pendingPerformances = [];
-  saveBtn.textContent = '保存';
+  saveBtn.textContent = t('btn_save');
   performanceSection.style.display = 'block';
   performanceNameInput.value = '';
   performanceDateInput.value = '';
@@ -1357,16 +1593,16 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   if (!valid) return;
 
   saveBtn.disabled = true;
-  saveBtn.textContent = '保存中…';
+  saveBtn.textContent = t('saving_status');
   try {
     let imageFileId = existingImageFileId;
     let imageType = existingImageType;
     let imageFileName = existingImageFileName;
     const hasImages = selectedFiles.some(f => f.type.startsWith('image/'));
     if (selectedFiles.length > 0 && hasImages) {
-      saveBtn.textContent = 'PDFに変換中…';
+      saveBtn.textContent = t('converting_pdf_status');
       const pdfFile = await imagesToPdfFile(selectedFiles.filter(f => f.type.startsWith('image/')));
-      saveBtn.textContent = '保存中…';
+      saveBtn.textContent = t('saving_status');
       const saved = await saveImageFile(pdfFile);
       imageFileId = saved.id;
       imageFileName = saved.fileName;
@@ -1404,20 +1640,20 @@ document.getElementById('cancel-btn').addEventListener('click', () => {
 // ================== 演奏会・作曲家・パートのマスタ管理 ==================
 function renderSimpleMasterList(containerEl, table, master, countFn) {
   containerEl.innerHTML = '';
-  if (db[table].length === 0) { containerEl.innerHTML = '<div class="empty">登録されたデータがありません</div>'; return; }
+  if (db[table].length === 0) { containerEl.innerHTML = `<div class="empty">${t('empty_no_master_data')}</div>`; return; }
   const sorted = [...db[table]].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   sorted.forEach(item => {
     const row = document.createElement('div');
     row.className = 'concert-row';
     row.innerHTML = `
-      <span>${escapeHtml(item.name)}<span class="count">・ ${countFn(item.id)}件で使用中</span></span>
-      <div class="actions"><button type="button" class="edit">編集</button><button type="button" class="delete">削除</button></div>
+      <span>${escapeHtml(item.name)}<span class="count">${tf('used_count_suffix', { count: countFn(item.id) })}</span></span>
+      <div class="actions"><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
     row.querySelector('.edit').addEventListener('click', () => {
       row.className = 'concert-row editing';
       row.innerHTML = `
         <div class="edit-fields"><input type="text" value="${escapeHtml(item.name)}" style="flex:1;"></div>
-        <div class="actions" style="justify-content:flex-end;"><button type="button" class="save">保存</button><button type="button" class="cancel">キャンセル</button></div>
+        <div class="actions" style="justify-content:flex-end;"><button type="button" class="save">${t('btn_save')}</button><button type="button" class="cancel">${t('btn_cancel')}</button></div>
       `;
       const nameInput = row.querySelector('input');
       row.querySelector('.save').addEventListener('click', async () => {
@@ -1431,7 +1667,7 @@ function renderSimpleMasterList(containerEl, table, master, countFn) {
     });
     row.querySelector('.delete').addEventListener('click', () => {
       const count = countFn(item.id);
-      const msg = count > 0 ? `このデータは${count}件で使用されています。削除すると紐付けが解除されます（楽曲・楽譜自体は削除されません）。削除しますか？` : '削除しますか？';
+      const msg = count > 0 ? tf('confirm_delete_used', { count }) : t('confirm_delete_simple');
       if (confirm(msg)) {
         master.remove(item.id).then(() => {
           if (table === 'composers') db.works.forEach(w => { if (w.composer_id === item.id) w.composer_id = null; });
@@ -1474,19 +1710,19 @@ const concertNewNameInput = document.getElementById('concert-new-name');
 const concertNewDateInput = document.getElementById('concert-new-date');
 function renderConcertMasterList() {
   concertMasterListEl.innerHTML = '';
-  if (db.concerts.length === 0) { concertMasterListEl.innerHTML = '<div class="empty">登録された演奏会がありません</div>'; return; }
+  if (db.concerts.length === 0) { concertMasterListEl.innerHTML = `<div class="empty">${t('empty_no_concerts')}</div>`; return; }
   const sorted = [...db.concerts].sort((a, b) => (b.concert_date || '').localeCompare(a.concert_date || ''));
   sorted.forEach(c => {
     const row = document.createElement('div');
     row.className = 'concert-row';
     row.innerHTML = `
-      <span>${escapeHtml(c.name)}${c.concert_date ? `<span class="date">${escapeHtml(c.concert_date)}</span>` : ''}<span class="count">・ ${performanceCountForConcert(c.id)}件で使用中</span></span>
-      <div class="actions"><button type="button" class="edit">編集</button><button type="button" class="delete">削除</button></div>
+      <span>${escapeHtml(c.name)}${c.concert_date ? `<span class="date">${escapeHtml(c.concert_date)}</span>` : ''}<span class="count">${tf('used_count_suffix', { count: performanceCountForConcert(c.id) })}</span></span>
+      <div class="actions"><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
     row.querySelector('.edit').addEventListener('click', () => startEditConcert(c.id));
     row.querySelector('.delete').addEventListener('click', () => {
       const count = performanceCountForConcert(c.id);
-      const msg = count > 0 ? `この演奏会は${count}件の楽譜に紐付いています。削除するとその紐付けも消えます。削除しますか？` : 'この演奏会を削除しますか？';
+      const msg = count > 0 ? tf('confirm_delete_concert_used', { count }) : t('confirm_delete_concert_simple');
       if (confirm(msg)) { deleteConcert(c.id).then(() => { renderConcertMasterList(); renderResults(); scheduleSync(); }); }
     });
     concertMasterListEl.appendChild(row);
@@ -1499,7 +1735,7 @@ function startEditConcert(concertId) {
   target.className = 'concert-row editing';
   target.innerHTML = `
     <div class="edit-fields"><input type="text" value="${escapeHtml(concert.name)}" style="flex:2;"><input type="date" value="${concert.concert_date || ''}" style="flex:1;"></div>
-    <div class="actions" style="justify-content:flex-end;"><button type="button" class="save">保存</button><button type="button" class="cancel">キャンセル</button></div>
+    <div class="actions" style="justify-content:flex-end;"><button type="button" class="save">${t('btn_save')}</button><button type="button" class="cancel">${t('btn_cancel')}</button></div>
   `;
   const [nameInput, dateInput] = target.querySelectorAll('input');
   target.querySelector('.save').addEventListener('click', async () => {
@@ -1546,11 +1782,11 @@ async function fetchAvailableModels(silent = false) {
   const apiKey = geminiApiKeyInput.value.trim() || localStorage.getItem('gemini_api_key');
   const statusEl = document.getElementById('model-fetch-status');
   if (!apiKey) {
-    if (!silent) alert('先にAPIキーを入力してください');
+    if (!silent) alert(t('alert_need_api_key'));
     return;
   }
   statusEl.style.display = 'block';
-  statusEl.textContent = '取得中…';
+  statusEl.textContent = t('fetching_status');
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
     const data = await res.json();
@@ -1577,8 +1813,8 @@ async function fetchAvailableModels(silent = false) {
     geminiModelNameInput.value = preferred;
     statusEl.textContent = `${candidates.length}件のモデルを取得しました（${preferred} を選択中）`;
   } catch (err) {
-    statusEl.textContent = '取得に失敗しました：' + err.message;
-    if (!silent) alert('取得に失敗しました：' + err.message);
+    statusEl.textContent = t('alert_fetch_failed') + err.message;
+    if (!silent) alert(t('alert_fetch_failed') + err.message);
   }
 }
 document.getElementById('model-fetch-btn').addEventListener('click', () => fetchAvailableModels(false));
@@ -1587,7 +1823,7 @@ geminiApiKeyInput.addEventListener('blur', () => { if (geminiApiKeyInput.value.t
 document.getElementById('gemini-settings-save-btn').addEventListener('click', () => {
   localStorage.setItem('gemini_api_key', geminiApiKeyInput.value.trim());
   localStorage.setItem('gemini_model_name', geminiModelNameInput.value.trim() || 'gemini-3.5-flash');
-  alert('保存しました');
+  alert(t('alert_saved'));
 });
 
 // ================== AIで読み取る ==================
@@ -1597,14 +1833,14 @@ function fileToBase64(file) { return fileToDataUrl(file).then(dataUrl => dataUrl
 
 aiReadBtn.addEventListener('click', async () => {
   const apiKey = localStorage.getItem('gemini_api_key');
-  if (!apiKey) { alert('先に「設定」画面でGemini APIキーを保存してください'); return; }
+  if (!apiKey) { alert(t('alert_need_gemini_key_settings')); return; }
   if (selectedFiles.length === 0 && !existingImageFileId) {
-    alert('写真またはPDFを選択してから読み取ってください（複数枚選んでいる場合は1枚目のみ読み取ります）');
+    alert(t('alert_select_photo_first'));
     return;
   }
   aiReadBtn.disabled = true;
   aiReadStatus.style.display = 'block';
-  aiReadStatus.textContent = '読み取り中…';
+  aiReadStatus.textContent = t('ai_reading_status');
   try {
     let base64, mimeType;
     if (selectedFiles.length > 0) {
@@ -1629,12 +1865,12 @@ aiReadBtn.addEventListener('click', async () => {
     if (!jsonMatch) throw new Error('読み取り結果を解析できませんでした');
     const result = JSON.parse(jsonMatch[0]);
     let filled = [];
-    if (result.title && !fTitle.value.trim()) { fTitle.value = result.title; fTitle.dispatchEvent(new Event('input', { bubbles: true })); filled.push('曲名'); }
-    if (result.composer && !fComposer.value.trim()) { fComposer.value = result.composer; filled.push('作曲家'); }
-    if (result.part && !fPart.value.trim()) { fPart.value = result.part; filled.push('パート名'); }
-    aiReadStatus.textContent = filled.length > 0 ? `読み取りました（${filled.join('・')}）。内容を確認・修正してください。` : '読み取れましたが、既に入力済みの項目は上書きしていません。';
+    if (result.title && !fTitle.value.trim()) { fTitle.value = result.title; fTitle.dispatchEvent(new Event('input', { bubbles: true })); filled.push(t('filter_title')); }
+    if (result.composer && !fComposer.value.trim()) { fComposer.value = result.composer; filled.push(t('label_composer')); }
+    if (result.part && !fPart.value.trim()) { fPart.value = result.part; filled.push(t('label_part')); }
+    aiReadStatus.textContent = filled.length > 0 ? tf('ai_read_filled', { fields: filled.join('・') }) : t('ai_read_no_new_fields');
   } catch (err) {
-    aiReadStatus.textContent = '読み取りに失敗しました：' + err.message;
+    aiReadStatus.textContent = t('ai_read_failed') + err.message;
   } finally {
     aiReadBtn.disabled = false;
   }
@@ -1737,7 +1973,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   if (!file) return;
   const text = await file.text();
   const data = JSON.parse(text);
-  const proceed = confirm('インポートすると、現在のデータはすべて削除され、このファイルの内容に置き換わります。この操作は取り消せません。実行しますか？');
+  const proceed = confirm(t('confirm_import'));
   if (!proceed) { e.target.value = ''; return; }
   for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files']) {
     const all = await idbGetAll(store);
@@ -1752,7 +1988,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   fileUrlCache.clear();
   await loadData();
   renderResults();
-  alert('インポートが完了しました');
+  alert(t('alert_import_done'));
   // インポートした内容全体を、同期先へ確実に反映させる
   if (syncHandle) await performSync({ forceWrite: true });
   if (driveFileId) await performDriveSync({ forceWrite: true });
@@ -1814,7 +2050,7 @@ function refreshSyncUI() {
   const setupBtn = document.getElementById('sync-setup-btn');
   const nowBtn = document.getElementById('sync-now-btn');
   if (!supportsFSA) {
-    setSyncStatus('このブラウザは自動同期に対応していません（メニューのエクスポート/インポートをご利用ください）');
+    setSyncStatus(t('sync_unsupported_browser'));
     setupBtn.style.display = 'none';
     nowBtn.style.display = 'none';
     return;
@@ -1822,9 +2058,9 @@ function refreshSyncUI() {
   setupBtn.style.display = 'block';
   nowBtn.style.display = syncHandle ? 'block' : 'none';
   if (syncHandle) {
-    setSyncStatus('設定済み：「' + SYNC_FOLDER_NAME + '」フォルダ内で同期中');
+    setSyncStatus(tf('sync_configured', { name: SYNC_FOLDER_NAME }));
   } else {
-    setSyncStatus('未設定（Google Driveなどの同期フォルダ内にファイルを1つ選んでください）');
+    setSyncStatus(t('sync_not_set_hint'));
   }
 }
 
@@ -1832,7 +2068,7 @@ function refreshSyncUI() {
 const syncHeaderBtn = document.getElementById('sync-now-header-btn');
 syncHeaderBtn.addEventListener('click', async () => {
   if (!syncHandle && !driveFileId) {
-    alert('先に「設定」画面で同期先を設定してください');
+    alert(t('alert_need_sync_target'));
     return;
   }
   if (syncHandle) await performSync({ manual: true });
@@ -1878,7 +2114,7 @@ document.getElementById('sync-setup-btn').addEventListener('click', async () => 
     await performSync({ forceWrite: true });
     setupSyncIntervalTimer();
   } catch (err) {
-    if (err.name !== 'AbortError') alert('設定に失敗しました：' + err.message);
+    if (err.name !== 'AbortError') alert(t('alert_setup_failed') + err.message);
   }
 });
 document.getElementById('sync-now-btn').addEventListener('click', () => performSync({ forceWrite: false, manual: true }));
@@ -2111,13 +2347,13 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
   try {
     const ok = await ensureSyncPermission();
     if (!ok) {
-      setSyncStatus('保存には許可が必要です。「今すぐ保存する」を押してください');
+      setSyncStatus(t('sync_permission_needed'));
       return;
     }
 
     lockAcquired = await acquireSyncLock(lockIO);
     if (!lockAcquired) {
-      setSyncStatus('他の端末が同期中のようです。しばらくしてからもう一度お試しください');
+      setSyncStatus(t('sync_other_device_syncing'));
       return;
     }
 
@@ -2131,7 +2367,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileLocalFileLocations();
-        setSyncStatus('最新の内容を取り込みました：' + new Date().toLocaleTimeString());
+        setSyncStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
         return;
       }
     }
@@ -2145,11 +2381,11 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     await writable.close();
     await saveSyncMeta();
     clearPendingChanges();
-    setSyncStatus('同期済み：' + new Date().toLocaleTimeString());
+    setSyncStatus(t('sync_done') + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('sync failed', err);
-    setSyncStatus('同期に失敗しました：' + err.message);
-    if (manual) alert('同期に失敗しました：' + err.message);
+    setSyncStatus(t('alert_sync_failed') + err.message);
+    if (manual) alert(t('alert_sync_failed') + err.message);
   } finally {
     if (lockAcquired) await releaseSyncLock(lockIO);
     syncInProgress = false;
@@ -2205,7 +2441,7 @@ function refreshDriveUI() {
   const popupHint = document.getElementById('drive-popup-hint');
   if (isMobileUA) {
     mobileNote.style.display = 'block';
-    mobileNote.textContent = 'スマートフォンでは実験的な対応です。うまく動かない場合はPCのブラウザをお試しください。';
+    mobileNote.textContent = t('drive_mobile_experimental');
     popupHint.style.display = 'block';
   } else {
     mobileNote.style.display = 'none';
@@ -2214,24 +2450,24 @@ function refreshDriveUI() {
   pcUi.style.display = 'block';
   const nowBtn = document.getElementById('drive-sync-now-btn');
   if (!GOOGLE_DRIVE_CLIENT_ID) {
-    setDriveStatus('この機能は現在準備中です');
+    setDriveStatus(t('drive_permission_pending'));
     nowBtn.style.display = 'none';
     return;
   }
   if (driveFileId) {
-    setDriveStatus('接続済み：「' + DRIVE_FOLDER_NAME + '」フォルダ内で同期中');
+    setDriveStatus(tf('drive_connected', { name: DRIVE_FOLDER_NAME }));
     nowBtn.style.display = 'block';
   } else {
-    setDriveStatus('未接続');
+    setDriveStatus(t('drive_status_disconnected'));
     nowBtn.style.display = 'none';
   }
 }
 
 function ensureDriveTokenClient() {
   const clientId = GOOGLE_DRIVE_CLIENT_ID;
-  if (!clientId) { alert('この機能は現在準備中です'); return null; }
+  if (!clientId) { alert(t('alert_feature_not_ready')); return null; }
   if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
-    alert('Googleの認証ライブラリの読み込みに失敗しました。少し待ってからお試しください。');
+    alert(t('alert_google_auth_load_failed'));
     return null;
   }
   if (!driveTokenClient) {
@@ -2239,7 +2475,7 @@ function ensureDriveTokenClient() {
       client_id: clientId,
       scope: 'https://www.googleapis.com/auth/drive.file',
       callback: (resp) => {
-        if (resp.error) { setDriveStatus('接続に失敗しました：' + resp.error); return; }
+        if (resp.error) { setDriveStatus(t('drive_connect_failed') + resp.error); return; }
         driveAccessToken = resp.access_token;
       },
     });
@@ -2255,7 +2491,7 @@ function requestDriveToken({ silent = false } = {}) {
     client.callback = (resp) => {
       client.callback = originalCallback;
       if (resp.error) {
-        if (!silent) setDriveStatus('接続に失敗しました：' + resp.error);
+        if (!silent) setDriveStatus(t('drive_connect_failed') + resp.error);
         resolve(false);
         return;
       }
@@ -2267,7 +2503,7 @@ function requestDriveToken({ silent = false } = {}) {
   const timeoutMs = silent ? 8000 : 60000;
   const timeoutPromise = new Promise((resolve) => {
     setTimeout(() => {
-      if (!silent) setDriveStatus('応答がありませんでした（ポップアップがブロックされていないか確認してください）');
+      if (!silent) setDriveStatus(t('drive_no_response'));
       resolve(false);
     }, timeoutMs);
   });
@@ -2459,7 +2695,7 @@ async function importMissingDriveFiles(data) {
 document.getElementById('drive-connect-btn').addEventListener('click', async () => {
   const ok = await requestDriveToken({ silent: false });
   if (!ok) return;
-  setDriveStatus('接続中の処理をしています…');
+  setDriveStatus(t('drive_connecting'));
   try {
     await findOrCreateDriveStructure();
     driveLastModified = null;
@@ -2468,7 +2704,7 @@ document.getElementById('drive-connect-btn').addEventListener('click', async () 
     await performDriveSync({ forceWrite: true });
     setupSyncIntervalTimer();
   } catch (err) {
-    setDriveStatus('接続に失敗しました：' + err.message);
+    setDriveStatus(t('drive_connect_failed') + err.message);
   }
 });
 document.getElementById('drive-sync-now-btn').addEventListener('click', () => performDriveSync({ manual: true }));
@@ -2530,14 +2766,14 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     if (!driveAccessToken) {
       const ok = await requestDriveToken({ silent: true });
       if (!ok) {
-        setDriveStatus('接続の更新が必要です。「Google Driveにつなぐ」を押してください');
+        setDriveStatus(t('drive_reauth_needed'));
         return;
       }
     }
 
     lockAcquired = await acquireSyncLock(lockIO);
     if (!lockAcquired) {
-      setDriveStatus('他の端末が同期中のようです。しばらくしてからもう一度お試しください');
+      setDriveStatus(t('sync_other_device_syncing'));
       return;
     }
 
@@ -2551,7 +2787,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileDriveFileLocations();
-        setDriveStatus('最新の内容を取り込みました：' + new Date().toLocaleTimeString());
+        setDriveStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
         return;
       }
     }
@@ -2567,11 +2803,11 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     });
     await saveDriveMeta();
     clearPendingChanges();
-    setDriveStatus('同期済み：' + new Date().toLocaleTimeString());
+    setDriveStatus(t('sync_done') + new Date().toLocaleTimeString());
   } catch (err) {
     console.error('drive sync failed', err);
-    setDriveStatus('同期に失敗しました：' + err.message);
-    if (manual) alert('同期に失敗しました：' + err.message);
+    setDriveStatus(t('alert_sync_failed') + err.message);
+    if (manual) alert(t('alert_sync_failed') + err.message);
   } finally {
     if (lockAcquired) await releaseSyncLock(lockIO);
     driveSyncInProgress = false;
@@ -2611,10 +2847,10 @@ async function deleteFileEverywhere(rec) {
 
 async function renderUnusedFilesList() {
   const container = document.getElementById('unused-files-list');
-  container.innerHTML = '<div class="empty">読み込み中…</div>';
+  container.innerHTML = `<div class="empty">${t('loading_status')}</div>`;
   const unused = await getUnusedFileRecords();
   if (unused.length === 0) {
-    container.innerHTML = '<div class="empty">未使用のファイルはありません</div>';
+    container.innerHTML = `<div class="empty">${t('alert_no_unused_files')}</div>`;
     return;
   }
   container.innerHTML = '';
@@ -2625,10 +2861,10 @@ async function renderUnusedFilesList() {
     const sizeKb = Math.round((rec.blob?.size || 0) / 1024);
     row.innerHTML = `
       <span>${escapeHtml(rec.fileName || rec.id)}<span class="count"> ・ ${sizeKb}KB</span></span>
-      <div class="actions"><button type="button" class="delete">削除</button></div>
+      <div class="actions"><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
     row.querySelector('.delete').addEventListener('click', async () => {
-      if (!confirm('このファイルを削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。')) return;
+      if (!confirm(t('confirm_delete_unused_file'))) return;
       await deleteFileEverywhere(rec);
       renderUnusedFilesList();
     });
@@ -2638,8 +2874,8 @@ async function renderUnusedFilesList() {
 document.getElementById('unused-files-refresh-btn').addEventListener('click', renderUnusedFilesList);
 document.getElementById('unused-files-delete-all-btn').addEventListener('click', async () => {
   const unused = await getUnusedFileRecords();
-  if (unused.length === 0) { alert('未使用のファイルはありません'); return; }
-  if (!confirm(`${unused.length}件の未使用ファイルをすべて削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。`)) return;
+  if (unused.length === 0) { alert(t('alert_no_unused_files')); return; }
+  if (!confirm(tf('confirm_delete_all_unused', { count: unused.length }))) return;
   for (const rec of unused) {
     await deleteFileEverywhere(rec);
   }
@@ -2679,11 +2915,11 @@ async function listDriveHistoryEntries() {
 
 async function renderSyncHistoryList() {
   const container = document.getElementById('sync-history-list');
-  container.innerHTML = '<div class="empty">読み込み中…</div>';
+  container.innerHTML = `<div class="empty">${t('loading_status')}</div>`;
   const [localEntries, driveEntries] = await Promise.all([listLocalHistoryEntries(), listDriveHistoryEntries()]);
   const all = [...localEntries, ...driveEntries];
   if (all.length === 0) {
-    container.innerHTML = '<div class="empty">まだ履歴がありません（同期を設定していない、またはまだ一度も同期していない場合は履歴がありません）</div>';
+    container.innerHTML = `<div class="empty">${t('no_history_yet')}</div>`;
     return;
   }
   container.innerHTML = '';
@@ -2691,8 +2927,8 @@ async function renderSyncHistoryList() {
     const row = document.createElement('div');
     row.className = 'concert-row';
     row.innerHTML = `
-      <span>${escapeHtml(formatHistoryLabel(entry.name))}<span class="count"> ・ ${entry.source === 'local' ? 'フォルダ' : 'Google Drive'}</span></span>
-      <div class="actions"><button type="button" class="restore">この内容に戻す</button></div>
+      <span>${escapeHtml(formatHistoryLabel(entry.name))}<span class="count"> ・ ${entry.source === 'local' ? t('source_folder') : 'Google Drive'}</span></span>
+      <div class="actions"><button type="button" class="restore">${t('btn_restore_this')}</button></div>
     `;
     row.querySelector('.restore').addEventListener('click', () => restoreFromHistoryEntry(entry));
     container.appendChild(row);
@@ -2722,7 +2958,7 @@ async function restoreImportedDataFull(data) {
 }
 
 async function restoreFromHistoryEntry(entry) {
-  if (!confirm('この時点の内容に復元します。現在のデータは、この内容で置き換わります。実行しますか？')) return;
+  if (!confirm(t('confirm_restore_history'))) return;
   try {
     let text;
     if (entry.source === 'local') {
@@ -2734,15 +2970,153 @@ async function restoreFromHistoryEntry(entry) {
     }
     const data = JSON.parse(text);
     await restoreImportedDataFull(data);
-    alert('復元しました');
+    alert(t('alert_restore_done'));
     showView('search');
   } catch (err) {
-    alert('復元に失敗しました：' + err.message);
+    alert(t('alert_restore_failed') + err.message);
   }
+}
+
+// ================== 表示設定（フォント） ==================
+const FONT_PRESETS = {
+  A: { body: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif', heading: 'Georgia, "Hiragino Mincho ProN", "Yu Mincho", serif' },
+  B: { body: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif', heading: '-apple-system, "Hiragino Sans", "Yu Gothic", sans-serif' },
+  C: { body: '"Hiragino Mincho ProN", "Yu Mincho", serif', heading: '"Hiragino Mincho ProN", "Yu Mincho", serif' },
+};
+function applyFontSettings() {
+  const preset = localStorage.getItem('font_preset') || 'A';
+  const customName = (localStorage.getItem('font_custom_name') || '').trim();
+  let body, heading;
+  if (preset === 'custom' && customName) {
+    const stack = `"${customName}", -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif`;
+    body = stack; heading = stack;
+  } else {
+    const p = FONT_PRESETS[preset] || FONT_PRESETS.A;
+    body = p.body; heading = p.heading;
+  }
+  document.documentElement.style.setProperty('--font-body', body);
+  document.documentElement.style.setProperty('--font-serif', heading);
+}
+function loadFontSettingsIntoForm() {
+  const preset = localStorage.getItem('font_preset') || 'A';
+  const fontPresetSelect = document.getElementById('font-preset-select');
+  const fontCustomField = document.getElementById('font-custom-field');
+  const fontCustomInput = document.getElementById('font-custom-input');
+  fontPresetSelect.value = preset;
+  fontCustomInput.value = localStorage.getItem('font_custom_name') || '';
+  fontCustomField.style.display = preset === 'custom' ? 'block' : 'none';
+}
+document.getElementById('font-preset-select').addEventListener('change', (e) => {
+  localStorage.setItem('font_preset', e.target.value);
+  document.getElementById('font-custom-field').style.display = e.target.value === 'custom' ? 'block' : 'none';
+  applyFontSettings();
+});
+document.getElementById('font-custom-input').addEventListener('input', (e) => {
+  localStorage.setItem('font_custom_name', e.target.value);
+  applyFontSettings();
+});
+
+// ================== 表示設定（言語） ==================
+function applyTranslations() {
+  document.querySelectorAll('.menu-dropdown button[data-view]').forEach(btn => {
+    const map = { search: 'menu_search', register: 'menu_register', concerts: 'menu_concerts', composers: 'menu_composers', parts: 'menu_parts', settings: 'menu_settings', 'unused-files': 'menu_unused_files', 'sync-history': 'menu_sync_history' };
+    const key = map[btn.dataset.view];
+    if (key) btn.textContent = t(key);
+  });
+  document.getElementById('export-btn').textContent = t('menu_export');
+  document.getElementById('import-btn').textContent = t('menu_import');
+  searchInput.placeholder = t('search_placeholder');
+  renderFilterChips();
+
+  document.getElementById('label-title').textContent = t('label_title');
+  document.getElementById('label-composer').textContent = t('label_composer');
+  document.getElementById('label-part').textContent = t('label_part');
+  document.getElementById('label-memo').textContent = t('label_memo');
+  document.getElementById('label-performance-history').textContent = t('label_performance_history');
+  document.getElementById('performance-name').placeholder = t('placeholder_concert_name');
+  document.getElementById('ai-read-btn').textContent = t('btn_ai_read');
+  document.getElementById('correct-skew-btn').textContent = t('btn_correct_skew');
+  document.getElementById('save-btn').textContent = editingScoreId ? t('btn_update') : t('btn_save');
+  document.getElementById('cancel-btn').textContent = t('btn_cancel');
+  document.getElementById('performance-add-btn').textContent = t('btn_add');
+
+  document.getElementById('concert-new-name').placeholder = t('placeholder_concert_name');
+  document.getElementById('concert-new-add-btn').textContent = t('btn_add');
+  document.getElementById('composer-new-name').placeholder = t('placeholder_composer_name');
+  document.getElementById('composer-new-add-btn').textContent = t('btn_add');
+  document.getElementById('part-new-name').placeholder = t('placeholder_part_name');
+  document.getElementById('part-new-add-btn').textContent = t('btn_add');
+
+  document.getElementById('settings-display-heading').textContent = t('settings_display');
+  document.getElementById('settings-font-label').textContent = t('settings_font');
+  document.getElementById('settings-ai-heading').textContent = t('settings_ai_read');
+  document.getElementById('font-option-a').textContent = t('font_option_a');
+  document.getElementById('font-option-b').textContent = t('font_option_b');
+  document.getElementById('font-option-c').textContent = t('font_option_c');
+  document.getElementById('font-option-custom').textContent = t('font_option_custom');
+  document.getElementById('font-custom-input').placeholder = t('font_custom_placeholder');
+  document.getElementById('font-custom-hint').textContent = t('font_custom_hint');
+
+  menuBtn.setAttribute('aria-label', t('aria_menu'));
+  syncHeaderBtn.setAttribute('aria-label', t('aria_sync_now'));
+  syncHeaderBtn.setAttribute('title', t('aria_sync_now'));
+  photoPlaceholder.textContent = t('photo_placeholder');
+  document.getElementById('title-error').textContent = t('error_title_required');
+  document.getElementById('part-error').textContent = t('error_part_required');
+  document.getElementById('ai-read-note').textContent = t('ai_read_note');
+
+  document.getElementById('label-gemini-key').textContent = t('settings_gemini_key');
+  document.getElementById('gemini-key-hint').innerHTML = t('gemini_key_hint_prefix') +
+    '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">' + t('gemini_key_hint_link') + '</a>' + t('gemini_key_hint_suffix');
+  document.getElementById('gemini-key-privacy-hint').textContent = t('gemini_key_privacy_hint');
+  document.getElementById('label-ai-model').textContent = t('settings_ai_model');
+  document.getElementById('model-fetch-btn').textContent = t('btn_fetch_models');
+  document.getElementById('gemini-settings-save-btn').textContent = t('btn_save');
+
+  document.getElementById('settings-autosave-heading').textContent = t('settings_autosave');
+  document.getElementById('settings-autosave-desc').textContent = t('settings_autosave_desc');
+  document.getElementById('sync-chip-local').textContent = t('sync_chip_local');
+  document.getElementById('sync-chip-cloud').textContent = t('sync_chip_cloud');
+  document.getElementById('sync-setup-btn').textContent = t('btn_choose_folder');
+  document.getElementById('sync-folder-hint').textContent = t('sync_folder_hint');
+  document.getElementById('sync-now-btn').textContent = t('btn_sync_now');
+  document.getElementById('label-cloud-provider').textContent = t('label_cloud_provider');
+  document.getElementById('drive-experimental-note').textContent = t('drive_experimental_note');
+  document.getElementById('drive-connect-btn').textContent = t('btn_connect_drive');
+  document.getElementById('drive-popup-hint').textContent = t('drive_popup_hint');
+  document.getElementById('drive-sync-now-btn').textContent = t('btn_sync_now');
+  document.getElementById('label-sync-interval').textContent = t('label_sync_interval');
+  document.getElementById('interval-option-0').textContent = t('interval_0');
+  document.getElementById('interval-option-5').textContent = t('interval_5');
+  document.getElementById('interval-option-15').textContent = t('interval_15');
+  document.getElementById('interval-option-30').textContent = t('interval_30');
+  document.getElementById('interval-option-60').textContent = t('interval_60');
+
+  document.getElementById('unused-files-desc').textContent = t('unused_files_desc');
+  document.getElementById('unused-files-refresh-btn').textContent = t('btn_refresh_list');
+  document.getElementById('unused-files-delete-all-btn').textContent = t('btn_delete_all');
+  document.getElementById('sync-history-desc').textContent = t('sync_history_desc');
+  document.getElementById('sync-history-refresh-btn').textContent = t('btn_load_history');
+  syncCenterBanner.textContent = t('sync_center_syncing');
+
+  // 接続状態などの現在値は、翻訳の巻き込みで消えないよう改めて反映する
+  refreshSyncUI();
+  refreshDriveUI();
+
+  renderResults();
+}
+document.getElementById('language-select').addEventListener('change', (e) => {
+  localStorage.setItem('app_language', e.target.value);
+  applyTranslations();
+});
+function loadLanguageIntoForm() {
+  document.getElementById('language-select').value = getLanguage();
 }
 
 // ================== 初期化 ==================
 (async () => {
+  applyFontSettings();
+  applyTranslations();
   await openIdb();
   await loadData();
   await loadSyncMeta();
