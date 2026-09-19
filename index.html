@@ -388,7 +388,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.002</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.003</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -514,6 +514,9 @@ const I18N = {
     skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
     skew_detect_failed: '自動検出できませんでした。点をドラッグして合わせてください',
     fetching_status: '取得中…',
+    btn_merge: '統合', btn_execute: '実行',
+    merge_no_others: '統合できる他の項目がありません',
+    confirm_merge: '「{source}」を「{target}」に統合します。{count}件のデータが引き継がれ、「{source}」は削除されます。この操作は取り消せません。実行しますか？',
   },
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
@@ -611,6 +614,9 @@ const I18N = {
     skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
     skew_detect_failed: 'Couldn\'t detect automatically. Please drag the points into place',
     fetching_status: 'Fetching…',
+    btn_merge: 'Merge', btn_execute: 'Execute',
+    merge_no_others: 'There are no other items to merge into',
+    confirm_merge: 'This will merge "{source}" into "{target}". {count} record(s) will be moved over, and "{source}" will be deleted. This cannot be undone. Continue?',
   },
 };
 function getLanguage() { return localStorage.getItem('app_language') || 'ja'; }
@@ -825,6 +831,37 @@ async function deleteConcert(id) {
     markDeleted('performances', p.id);
   }
   db.performances = db.performances.filter(p => p.concert_id !== id);
+}
+
+// ================== マスタの統合（別表記で登録してしまったものをまとめる） ==================
+async function mergeComposerInto(sourceId, targetId) {
+  const affected = db.works.filter(w => w.composer_id === sourceId);
+  for (const w of affected) {
+    w.composer_id = targetId;
+    await idbPut('works', w);
+    markChanged('works', w.id);
+  }
+  await composerMaster.remove(sourceId);
+}
+async function mergePartInto(sourceId, targetId) {
+  const affected = db.scores.filter(s => s.part_id === sourceId);
+  for (const s of affected) {
+    s.part_id = targetId;
+    await idbPut('scores', s);
+    markChanged('scores', s.id);
+  }
+  await partMaster.remove(sourceId);
+}
+async function mergeConcertInto(sourceId, targetId) {
+  const affected = db.performances.filter(p => p.concert_id === sourceId);
+  for (const p of affected) {
+    p.concert_id = targetId;
+    await idbPut('performances', p);
+    markChanged('performances', p.id);
+  }
+  await idbDelete('concerts', sourceId);
+  db.concerts = db.concerts.filter(c => c.id !== sourceId);
+  markDeleted('concerts', sourceId);
 }
 function performanceCountForConcert(id) { return db.performances.filter(p => p.concert_id === id).length; }
 async function addPerformance({ scoreId, concertName, concertDate }) {
@@ -1662,8 +1699,33 @@ function renderSimpleMasterList(containerEl, table, master, countFn) {
     row.className = 'concert-row';
     row.innerHTML = `
       <span>${escapeHtml(item.name)}<span class="count">${tf('used_count_suffix', { count: countFn(item.id) })}</span></span>
-      <div class="actions"><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
+      <div class="actions"><button type="button" class="merge">${t('btn_merge')}</button><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
+    row.querySelector('.merge').addEventListener('click', () => {
+      const others = db[table].filter(x => x.id !== item.id).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      if (others.length === 0) { alert(t('merge_no_others')); return; }
+      row.className = 'concert-row editing';
+      row.innerHTML = `
+        <div class="edit-fields">
+          <span style="flex-shrink:0; font-size:13px; display:flex; align-items:center;">${escapeHtml(item.name)} →</span>
+          <select style="flex:1;">${others.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')}</select>
+        </div>
+        <div class="actions" style="justify-content:flex-end;"><button type="button" class="execute">${t('btn_execute')}</button><button type="button" class="cancel">${t('btn_cancel')}</button></div>
+      `;
+      const select = row.querySelector('select');
+      row.querySelector('.execute').addEventListener('click', async () => {
+        const targetId = select.value;
+        const targetItem = others.find(o => o.id === targetId);
+        const count = countFn(item.id);
+        if (!confirm(tf('confirm_merge', { source: item.name, target: targetItem.name, count }))) return;
+        if (table === 'composers') await mergeComposerInto(item.id, targetId);
+        else await mergePartInto(item.id, targetId);
+        renderSimpleMasterList(containerEl, table, master, countFn);
+        renderResults();
+        scheduleSync();
+      });
+      row.querySelector('.cancel').addEventListener('click', () => renderSimpleMasterList(containerEl, table, master, countFn));
+    });
     row.querySelector('.edit').addEventListener('click', () => {
       row.className = 'concert-row editing';
       row.innerHTML = `
@@ -1732,8 +1794,32 @@ function renderConcertMasterList() {
     row.className = 'concert-row';
     row.innerHTML = `
       <span>${escapeHtml(c.name)}${c.concert_date ? `<span class="date">${escapeHtml(c.concert_date)}</span>` : ''}<span class="count">${tf('used_count_suffix', { count: performanceCountForConcert(c.id) })}</span></span>
-      <div class="actions"><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
+      <div class="actions"><button type="button" class="merge">${t('btn_merge')}</button><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
+    row.querySelector('.merge').addEventListener('click', () => {
+      const others = db.concerts.filter(x => x.id !== c.id).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      if (others.length === 0) { alert(t('merge_no_others')); return; }
+      row.className = 'concert-row editing';
+      row.innerHTML = `
+        <div class="edit-fields">
+          <span style="flex-shrink:0; font-size:13px; display:flex; align-items:center;">${escapeHtml(c.name)} →</span>
+          <select style="flex:1;">${others.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')}</select>
+        </div>
+        <div class="actions" style="justify-content:flex-end;"><button type="button" class="execute">${t('btn_execute')}</button><button type="button" class="cancel">${t('btn_cancel')}</button></div>
+      `;
+      const select = row.querySelector('select');
+      row.querySelector('.execute').addEventListener('click', async () => {
+        const targetId = select.value;
+        const targetItem = others.find(o => o.id === targetId);
+        const count = performanceCountForConcert(c.id);
+        if (!confirm(tf('confirm_merge', { source: c.name, target: targetItem.name, count }))) return;
+        await mergeConcertInto(c.id, targetId);
+        renderConcertMasterList();
+        renderResults();
+        scheduleSync();
+      });
+      row.querySelector('.cancel').addEventListener('click', renderConcertMasterList);
+    });
     row.querySelector('.edit').addEventListener('click', () => startEditConcert(c.id));
     row.querySelector('.delete').addEventListener('click', () => {
       const count = performanceCountForConcert(c.id);
