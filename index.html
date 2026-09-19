@@ -365,7 +365,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.028</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.030</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -1950,13 +1950,38 @@ async function backupLocalHistory() {
   } catch (err) { console.error('local history backup failed', err); }
 }
 
+async function ensureLocalUnusedDir() {
+  if (!syncDirHandle) return null;
+  return syncDirHandle.getDirectoryHandle('unused', { create: true });
+}
+
+async function moveLocalFileEntry(sourceDir, destDir, name) {
+  try {
+    const fileHandle = await sourceDir.getFileHandle(name);
+    if (typeof fileHandle.move === 'function') {
+      await fileHandle.move(destDir);
+    } else {
+      const file = await fileHandle.getFile();
+      const newHandle = await destDir.getFileHandle(name, { create: true });
+      const w = await newHandle.createWritable();
+      await w.write(file);
+      await w.close();
+      await sourceDir.removeEntry(name).catch(() => {});
+    }
+  } catch (err) { /* 対象ファイルが無ければ何もしない */ }
+}
+
 async function pushLocalFiles() {
   if (!syncFilesDirHandle) return;
+  const unusedDir = await ensureLocalUnusedDir();
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
     const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
     let exists = false;
     try { await syncFilesDirHandle.getFileHandle(fname); exists = true; } catch (e) { exists = false; }
+    if (!exists && unusedDir) {
+      try { await unusedDir.getFileHandle(fname); exists = true; } catch (e) { /* なければ通常通りアップロード */ }
+    }
     if (exists) continue;
     try {
       const fh = await syncFilesDirHandle.getFileHandle(fname, { create: true });
@@ -1967,29 +1992,47 @@ async function pushLocalFiles() {
   }
 }
 
-async function cleanupLocalOrphanFiles() {
-  if (!syncFilesDirHandle) return;
+// 紐付けが外れたファイルは削除せず「unused」フォルダへ移動する（再び参照されたら戻す）
+async function reconcileLocalFileLocations() {
+  if (!syncFilesDirHandle || !syncDirHandle) return;
+  const unusedDir = await ensureLocalUnusedDir();
+  if (!unusedDir) return;
   const referencedNames = new Set(
     db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
   );
   try {
-    for await (const [name] of syncFilesDirHandle.entries()) {
+    const filesNames = [];
+    for await (const [name] of syncFilesDirHandle.entries()) filesNames.push(name);
+    for (const name of filesNames) {
       if (!referencedNames.has(name)) {
-        await syncFilesDirHandle.removeEntry(name).catch(() => {});
+        await moveLocalFileEntry(syncFilesDirHandle, unusedDir, name);
       }
     }
-  } catch (err) { console.error('cleanup local orphan files failed', err); }
+    const unusedNames = [];
+    for await (const [name] of unusedDir.entries()) unusedNames.push(name);
+    for (const name of unusedNames) {
+      if (referencedNames.has(name)) {
+        await moveLocalFileEntry(unusedDir, syncFilesDirHandle, name);
+      }
+    }
+  } catch (err) { console.error('reconcile local file locations failed', err); }
 }
 
 async function importMissingLocalFiles(data) {
   if (!syncFilesDirHandle) return;
+  const unusedDir = await ensureLocalUnusedDir();
   for (const score of (data.scores || [])) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
     const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
+    let fh = null;
+    try { fh = await syncFilesDirHandle.getFileHandle(fname); } catch (e) { /* filesに無ければunusedを探す */ }
+    if (!fh && unusedDir) {
+      try { fh = await unusedDir.getFileHandle(fname); } catch (e) { /* どちらにも無い */ }
+    }
+    if (!fh) { console.error('missing local file', fname); continue; }
     try {
-      const fh = await syncFilesDirHandle.getFileHandle(fname);
       const file = await fh.getFile();
       await idbPut('files', { id: score.image_file_id, blob: file, type: score.image_type, created_at: nowIso() });
     } catch (err) { console.error('missing local file', fname, err); }
@@ -2019,6 +2062,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     }
 
     await pushLocalFiles();
+    await reconcileLocalFileLocations();
     await backupLocalHistory();
     const data = await buildExportData();
     const writable = await syncHandle.createWritable();
@@ -2237,15 +2281,33 @@ async function backupDriveHistory() {
   } catch (err) { console.error('drive history backup failed', err); }
 }
 
+async function findOrCreateDriveUnusedFolder() {
+  if (!driveFolderId) return null;
+  return findOrCreateDriveFolder('unused', driveFolderId);
+}
+
+async function findDriveFileInFolder(folderId, fname) {
+  const q = encodeURIComponent(`name='${fname}' and '${folderId}' in parents and trashed=false`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const listData = await listRes.json();
+  return (listData.files && listData.files[0]) ? listData.files[0].id : null;
+}
+
+async function moveDriveFile(fileId, fromFolderId, toFolderId) {
+  await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${toFolderId}&removeParents=${fromFolderId}`, {
+    method: 'PATCH',
+  });
+}
+
 async function pushDriveFiles() {
   if (!driveFilesFolderId) return;
+  const unusedFolderId = await findOrCreateDriveUnusedFolder();
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
     const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
-    const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
-    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
-    const listData = await listRes.json();
-    if (listData.files && listData.files.length > 0) continue;
+    let exists = !!(await findDriveFileInFolder(driveFilesFolderId, fname));
+    if (!exists && unusedFolderId) exists = !!(await findDriveFileInFolder(unusedFolderId, fname));
+    if (exists) continue;
 
     try {
       const boundary = 'scoremate' + Date.now();
@@ -2269,36 +2331,46 @@ async function pushDriveFiles() {
   }
 }
 
-async function cleanupDriveOrphanFiles() {
-  if (!driveFilesFolderId) return;
+// 紐付けが外れたファイルは削除せず「unused」フォルダへ移動する（再び参照されたら戻す）
+async function reconcileDriveFileLocations() {
+  if (!driveFilesFolderId || !driveFolderId) return;
+  const unusedFolderId = await findOrCreateDriveUnusedFolder();
+  if (!unusedFolderId) return;
   const referencedNames = new Set(
     db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
   );
   try {
-    const q = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
-    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
-    const listData = await listRes.json();
-    for (const f of (listData.files || [])) {
+    const qFiles = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
+    const listFilesRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${qFiles}&fields=files(id,name)`);
+    const listFiles = await listFilesRes.json();
+    for (const f of (listFiles.files || [])) {
       if (!referencedNames.has(f.name)) {
-        await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' }).catch(() => {});
+        await moveDriveFile(f.id, driveFilesFolderId, unusedFolderId).catch(() => {});
       }
     }
-  } catch (err) { console.error('cleanup drive orphan files failed', err); }
+    const qUnused = encodeURIComponent(`'${unusedFolderId}' in parents and trashed=false`);
+    const listUnusedRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${qUnused}&fields=files(id,name)`);
+    const listUnused = await listUnusedRes.json();
+    for (const f of (listUnused.files || [])) {
+      if (referencedNames.has(f.name)) {
+        await moveDriveFile(f.id, unusedFolderId, driveFilesFolderId).catch(() => {});
+      }
+    }
+  } catch (err) { console.error('reconcile drive file locations failed', err); }
 }
 
 async function importMissingDriveFiles(data) {
   if (!driveFilesFolderId) return;
+  const unusedFolderId = await findOrCreateDriveUnusedFolder();
   for (const score of (data.scores || [])) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
     const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     try {
-      const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
-      const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
-      const listData = await listRes.json();
-      if (!listData.files || listData.files.length === 0) { console.error('missing drive file', fname); continue; }
-      const fileId = listData.files[0].id;
+      let fileId = await findDriveFileInFolder(driveFilesFolderId, fname);
+      if (!fileId && unusedFolderId) fileId = await findDriveFileInFolder(unusedFolderId, fname);
+      if (!fileId) { console.error('missing drive file', fname); continue; }
       const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       const blob = await contentRes.blob();
       await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
@@ -2348,6 +2420,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     }
 
     await pushDriveFiles();
+    await reconcileDriveFileLocations();
     await backupDriveHistory();
     const data = await buildExportData();
     await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
@@ -2374,6 +2447,29 @@ async function getUnusedFileRecords() {
   return allFiles.filter(rec => !referencedIds.has(rec.id));
 }
 
+async function deleteFileEverywhere(rec) {
+  await idbDelete('files', rec.id);
+  fileUrlCache.delete(rec.id);
+  const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
+  if (syncFilesDirHandle) {
+    await syncFilesDirHandle.removeEntry(fname).catch(() => {});
+    const unusedDir = await ensureLocalUnusedDir();
+    if (unusedDir) await unusedDir.removeEntry(fname).catch(() => {});
+  }
+  if (driveFilesFolderId) {
+    try {
+      const unusedFolderId = await findOrCreateDriveUnusedFolder();
+      const folderIds = [driveFilesFolderId, unusedFolderId].filter(Boolean);
+      for (const folderId of folderIds) {
+        const fileId = await findDriveFileInFolder(folderId, fname);
+        if (fileId) {
+          await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' }).catch(() => {});
+        }
+      }
+    } catch (err) { console.error('drive file delete failed', fname, err); }
+  }
+}
+
 async function renderUnusedFilesList() {
   const container = document.getElementById('unused-files-list');
   container.innerHTML = '<div class="empty">読み込み中…</div>';
@@ -2393,9 +2489,8 @@ async function renderUnusedFilesList() {
       <div class="actions"><button type="button" class="delete">削除</button></div>
     `;
     row.querySelector('.delete').addEventListener('click', async () => {
-      if (!confirm('このファイルを削除しますか？（この操作は取り消せません）')) return;
-      await idbDelete('files', rec.id);
-      fileUrlCache.delete(rec.id);
+      if (!confirm('このファイルを削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。')) return;
+      await deleteFileEverywhere(rec);
       renderUnusedFilesList();
     });
     container.appendChild(row);
@@ -2405,10 +2500,9 @@ document.getElementById('unused-files-refresh-btn').addEventListener('click', re
 document.getElementById('unused-files-delete-all-btn').addEventListener('click', async () => {
   const unused = await getUnusedFileRecords();
   if (unused.length === 0) { alert('未使用のファイルはありません'); return; }
-  if (!confirm(`${unused.length}件の未使用ファイルをすべて削除しますか？この操作は取り消せません。`)) return;
+  if (!confirm(`${unused.length}件の未使用ファイルをすべて削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。`)) return;
   for (const rec of unused) {
-    await idbDelete('files', rec.id);
-    fileUrlCache.delete(rec.id);
+    await deleteFileEverywhere(rec);
   }
   renderUnusedFilesList();
 });
@@ -2480,8 +2574,14 @@ async function restoreImportedDataFull(data) {
   for (const t of (data.tombstones || [])) await idbPut('tombstones', t);
   fileUrlCache.clear();
   await loadData();
-  if (syncFilesDirHandle) await importMissingLocalFiles(data);
-  if (driveFilesFolderId) await importMissingDriveFiles(data);
+  if (syncFilesDirHandle) {
+    await importMissingLocalFiles(data);
+    await reconcileLocalFileLocations();
+  }
+  if (driveFilesFolderId) {
+    await importMissingDriveFiles(data);
+    await reconcileDriveFileLocations();
+  }
   renderResults();
   scheduleSync();
 }
