@@ -365,7 +365,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.032</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.033</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -2563,16 +2563,36 @@ async function renderSyncHistoryList() {
 document.getElementById('sync-history-refresh-btn').addEventListener('click', renderSyncHistoryList);
 
 async function restoreImportedDataFull(data) {
-  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
+  const RESTORE_TABLES = ['works', 'scores', 'composers', 'parts', 'concerts', 'performances'];
+  const currentByTable = {};
+  for (const table of RESTORE_TABLES) {
+    currentByTable[table] = await idbGetAll(table);
+  }
+
+  for (const store of RESTORE_TABLES) {
     const all = await idbGetAll(store);
     for (const item of all) await idbDelete(store, item.id);
   }
-  for (const table of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
+  for (const table of RESTORE_TABLES) {
     for (const item of (data[table] || [])) await idbPut(table, item);
   }
+
+  // まず、この復元スナップショット時点の削除記録に置き換える
   const existingTombstones = await idbGetAll('tombstones');
   for (const t of existingTombstones) await idbDelete('tombstones', t.id);
   for (const t of (data.tombstones || [])) await idbPut('tombstones', t);
+
+  // 復元前に存在していたが、復元後に無くなる項目は「削除された」として記録を追加する
+  // （これが無いと、他端末が同期したときに復活してしまう）
+  for (const table of RESTORE_TABLES) {
+    const restoredIds = new Set((data[table] || []).map(item => item.id));
+    for (const item of currentByTable[table]) {
+      if (!restoredIds.has(item.id)) {
+        await recordTombstone(table, item.id);
+      }
+    }
+  }
+
   fileUrlCache.clear();
   await loadData();
   // 復元した内容に必要なファイルを取得しておく（files/unusedどちらにあっても探す）
