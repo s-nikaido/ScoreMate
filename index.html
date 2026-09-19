@@ -365,7 +365,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.031</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.032</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -2575,16 +2575,13 @@ async function restoreImportedDataFull(data) {
   for (const t of (data.tombstones || [])) await idbPut('tombstones', t);
   fileUrlCache.clear();
   await loadData();
-  if (syncFilesDirHandle) {
-    await importMissingLocalFiles(data);
-    await reconcileLocalFileLocations();
-  }
-  if (driveFilesFolderId) {
-    await importMissingDriveFiles(data);
-    await reconcileDriveFileLocations();
-  }
+  // 復元した内容に必要なファイルを取得しておく（files/unusedどちらにあっても探す）
+  if (syncFilesDirHandle) await importMissingLocalFiles(data);
+  if (driveFilesFolderId) await importMissingDriveFiles(data);
   renderResults();
-  scheduleSync();
+  // 復元は「これが正しい状態」として、マージせず強制的に同期先へ上書きする
+  if (syncHandle) await performSync({ forceWrite: true });
+  if (driveFileId) await performDriveSync({ forceWrite: true });
 }
 
 async function restoreFromHistoryEntry(entry) {
