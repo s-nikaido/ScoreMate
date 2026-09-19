@@ -192,6 +192,8 @@
           <button type="button" data-view="parts">パート</button>
           <div class="menu-divider"></div>
           <button type="button" data-view="settings">設定</button>
+          <button type="button" data-view="unused-files">未使用ファイル</button>
+          <button type="button" data-view="sync-history">同期履歴</button>
           <button type="button" id="export-btn">エクスポート（バックアップ）</button>
           <button type="button" id="import-btn">インポート（復元）</button>
           <input type="file" id="import-file-input" accept="application/json" style="display:none;">
@@ -348,9 +350,22 @@
         </select>
       </div>
     </section>
+
+    <section id="view-unused-files" class="view">
+      <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">どの楽譜からも参照されなくなった画像・PDFです。削除しても登録済みの楽譜には影響しません。</p>
+      <button type="button" id="unused-files-refresh-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">一覧を更新</button>
+      <button type="button" id="unused-files-delete-all-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--danger); border-radius:var(--radius); background:none; color:var(--danger); font-size:13px; cursor:pointer;">すべて削除</button>
+      <div id="unused-files-list"></div>
+    </section>
+
+    <section id="view-sync-history" class="view">
+      <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">同期のたびに、直前の状態を自動でバックアップしています（最新20件）。不測の事態が起きたときは、ここから復元できます。</p>
+      <button type="button" id="sync-history-refresh-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">履歴を読み込む</button>
+      <div id="sync-history-list"></div>
+    </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.027</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.028</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -481,26 +496,28 @@ async function updateWorkFields(workId, { title, composer }) {
 
 async function saveImageFile(file) {
   const id = genId();
-  await idbPut('files', { id, blob: file, type: file.type, created_at: nowIso() });
-  return id;
+  const createdAt = nowIso();
+  const fileName = fileNameFor(id, file.type, createdAt);
+  await idbPut('files', { id, blob: file, type: file.type, created_at: createdAt, fileName });
+  return { id, fileName };
 }
 async function getImageFile(id) { return id ? idbGet('files', id) : null; }
 async function deleteImageFile(id) { if (id) await idbDelete('files', id); }
 
-async function addScore({ workId, partName, memo, imageFileId, imageType }) {
+async function addScore({ workId, partName, memo, imageFileId, imageType, imageFileName }) {
   const partRow = await partMaster.addOrGet(partName);
-  const score = { id: genId(), work_id: workId, part_id: partRow.id, memo: memo.trim(), image_file_id: imageFileId || null, image_type: imageType || null, created_at: nowIso() };
+  const score = { id: genId(), work_id: workId, part_id: partRow.id, memo: memo.trim(), image_file_id: imageFileId || null, image_type: imageType || null, image_file_name: imageFileName || null, created_at: nowIso() };
   await idbPut('scores', score);
   db.scores.push(score);
   return score;
 }
-async function updateScore(scoreId, { partName, memo, imageFileId, imageType }) {
+async function updateScore(scoreId, { partName, memo, imageFileId, imageType, imageFileName }) {
   const partRow = await partMaster.addOrGet(partName);
   const score = db.scores.find(s => s.id === scoreId);
   if (!score) return;
   score.part_id = partRow.id;
   score.memo = memo.trim();
-  if (imageFileId) { score.image_file_id = imageFileId; score.image_type = imageType; }
+  if (imageFileId) { score.image_file_id = imageFileId; score.image_type = imageType; score.image_file_name = imageFileName; }
   await idbPut('scores', score);
 }
 function scoresForWork(workId) { return db.scores.filter(s => s.work_id === workId); }
@@ -510,7 +527,7 @@ async function deleteScore(scoreId) {
   const score = db.scores.find(s => s.id === scoreId);
   if (!score) return;
   await idbDelete('scores', scoreId);
-  if (score.image_file_id) await deleteImageFile(score.image_file_id);
+  // 添付ファイルは削除しない（紐付けのみ解除。ファイル本体は「未使用ファイル」メニューから手動で削除できます）
   db.scores = db.scores.filter(s => s.id !== scoreId);
   await recordTombstone('scores', scoreId);
   const relatedPerfs = db.performances.filter(p => p.score_id === scoreId);
@@ -606,6 +623,8 @@ const viewConcerts = document.getElementById('view-concerts');
 const viewComposers = document.getElementById('view-composers');
 const viewParts = document.getElementById('view-parts');
 const viewSettings = document.getElementById('view-settings');
+const viewUnusedFiles = document.getElementById('view-unused-files');
+const viewSyncHistory = document.getElementById('view-sync-history');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 
@@ -616,11 +635,15 @@ function showView(name) {
   viewComposers.classList.toggle('active', name === 'composers');
   viewParts.classList.toggle('active', name === 'parts');
   viewSettings.classList.toggle('active', name === 'settings');
+  viewUnusedFiles.classList.toggle('active', name === 'unused-files');
+  viewSyncHistory.classList.toggle('active', name === 'sync-history');
   if (name === 'search') renderResults();
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
   if (name === 'parts') renderPartMasterList();
   if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); }
+  if (name === 'unused-files') renderUnusedFilesList();
+  if (name === 'sync-history') renderSyncHistoryList();
 }
 menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menuDropdown.classList.toggle('open'); });
 document.addEventListener('click', () => menuDropdown.classList.remove('open'));
@@ -912,6 +935,7 @@ function startEditScore(scoreId) {
   updateCorrectSkewBtnVisibility();
   existingImageFileId = score.image_file_id || null;
   existingImageType = score.image_type || null;
+  existingImageFileName = score.image_file_name || null;
   if (score.image_file_id) {
     getFileUrl(score.image_file_id).then(url => {
       if (isPdfType(score.image_type)) {
@@ -958,6 +982,7 @@ const photoPlaceholder = document.getElementById('photo-placeholder');
 let selectedFiles = [];
 let existingImageFileId = null;
 let existingImageType = null;
+let existingImageFileName = null;
 
 function isPdf(file) { return file && file.type === 'application/pdf'; }
 
@@ -1292,6 +1317,7 @@ function resetForm() {
   selectedFiles = [];
   existingImageFileId = null;
   existingImageType = null;
+  existingImageFileName = null;
   photoFile.value = '';
   updateCorrectSkewBtnVisibility();
   partError.style.display = 'none';
@@ -1317,25 +1343,30 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     let imageFileId = existingImageFileId;
     let imageType = existingImageType;
+    let imageFileName = existingImageFileName;
     const hasImages = selectedFiles.some(f => f.type.startsWith('image/'));
     if (selectedFiles.length > 0 && hasImages) {
       saveBtn.textContent = 'PDFに変換中…';
       const pdfFile = await imagesToPdfFile(selectedFiles.filter(f => f.type.startsWith('image/')));
       saveBtn.textContent = '保存中…';
-      imageFileId = await saveImageFile(pdfFile);
+      const saved = await saveImageFile(pdfFile);
+      imageFileId = saved.id;
+      imageFileName = saved.fileName;
       imageType = pdfFile.type;
     } else if (selectedFiles.length === 1) {
-      imageFileId = await saveImageFile(selectedFiles[0]);
+      const saved = await saveImageFile(selectedFiles[0]);
+      imageFileId = saved.id;
+      imageFileName = saved.fileName;
       imageType = selectedFiles[0].type;
     }
 
     if (editingScoreId) {
       const score = db.scores.find(s => s.id === editingScoreId);
       await updateWorkFields(score.work_id, { title: fTitle.value, composer: fComposer.value });
-      await updateScore(editingScoreId, { partName: fPart.value, memo: fMemo.value, imageFileId, imageType });
+      await updateScore(editingScoreId, { partName: fPart.value, memo: fMemo.value, imageFileId, imageType, imageFileName });
     } else {
       const work = await addOrGetWork({ title: fTitle.value, composer: fComposer.value });
-      const newScore = await addScore({ workId: work.id, partName: fPart.value, memo: fMemo.value, imageFileId, imageType });
+      const newScore = await addScore({ workId: work.id, partName: fPart.value, memo: fMemo.value, imageFileId, imageType, imageFileName });
       for (const p of pendingPerformances) {
         await addPerformance({ scoreId: newScore.id, concertName: p.concertName, concertDate: p.concertDate });
       }
@@ -1599,9 +1630,16 @@ function extForMime(mime) {
   if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
   return 'bin';
 }
-function fileNameFor(id, mime) {
-  return `${id}.${extForMime(mime)}`;
+function fileNameFor(id, mime, createdAt) {
+  const dateStr = (createdAt || nowIso()).slice(0, 10).replace(/-/g, '');
+  return `${dateStr}_${id}.${extForMime(mime)}`;
 }
+function timestampForFilename() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+const HISTORY_KEEP_COUNT = 20;
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -1859,7 +1897,7 @@ async function mergeImportedData(remoteData) {
 
   fileUrlCache.clear();
   await loadData();
-  await cleanupOrphanLocalBlobs();
+  // 未使用ファイルは自動削除せず、メニューの「未使用ファイル」から手動で削除できます
   renderResults();
 }
 
@@ -1890,11 +1928,33 @@ function stopSyncSpin() {
   }
 }
 
+async function backupLocalHistory() {
+  if (!syncDirHandle || !syncHandle) return;
+  try {
+    const file = await syncHandle.getFile();
+    const text = await file.text();
+    if (!text.trim()) return;
+    const historyDir = await syncDirHandle.getDirectoryHandle('history', { create: true });
+    const fname = `data-${timestampForFilename()}.json`;
+    const fh = await historyDir.getFileHandle(fname, { create: true });
+    const w = await fh.createWritable();
+    await w.write(text);
+    await w.close();
+    const names = [];
+    for await (const [name] of historyDir.entries()) names.push(name);
+    names.sort();
+    const excess = names.length - HISTORY_KEEP_COUNT;
+    for (let i = 0; i < excess; i++) {
+      await historyDir.removeEntry(names[i]).catch(() => {});
+    }
+  } catch (err) { console.error('local history backup failed', err); }
+}
+
 async function pushLocalFiles() {
   if (!syncFilesDirHandle) return;
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
-    const fname = fileNameFor(rec.id, rec.type);
+    const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
     let exists = false;
     try { await syncFilesDirHandle.getFileHandle(fname); exists = true; } catch (e) { exists = false; }
     if (exists) continue;
@@ -1910,7 +1970,7 @@ async function pushLocalFiles() {
 async function cleanupLocalOrphanFiles() {
   if (!syncFilesDirHandle) return;
   const referencedNames = new Set(
-    db.scores.filter(s => s.image_file_id).map(s => fileNameFor(s.image_file_id, s.image_type))
+    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
   );
   try {
     for await (const [name] of syncFilesDirHandle.entries()) {
@@ -1927,7 +1987,7 @@ async function importMissingLocalFiles(data) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
-    const fname = fileNameFor(score.image_file_id, score.image_type);
+    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     try {
       const fh = await syncFilesDirHandle.getFileHandle(fname);
       const file = await fh.getFile();
@@ -1959,7 +2019,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     }
 
     await pushLocalFiles();
-    await cleanupLocalOrphanFiles();
+    await backupLocalHistory();
     const data = await buildExportData();
     const writable = await syncHandle.createWritable();
     await writable.write(JSON.stringify(data));
@@ -2143,11 +2203,45 @@ async function findOrCreateDriveStructure() {
   driveFileId = await findOrCreateDriveDataFile(driveFolderId);
 }
 
+async function backupDriveHistory() {
+  if (!driveFolderId || !driveFileId) return;
+  try {
+    const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+    const text = await contentRes.text();
+    if (!text.trim()) return;
+    const historyFolderId = await findOrCreateDriveFolder('history', driveFolderId);
+    const fname = `data-${timestampForFilename()}.json`;
+    const boundary = 'scoremate' + Date.now();
+    const metadata = { name: fname, parents: [historyFolderId] };
+    const body =
+      `--${boundary}\r\n` +
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+      JSON.stringify(metadata) + `\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: application/json\r\n\r\n` +
+      text + `\r\n` +
+      `--${boundary}--`;
+    await driveApiFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    const q = encodeURIComponent(`'${historyFolderId}' in parents and trashed=false`);
+    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+    const listData = await listRes.json();
+    const files = (listData.files || []).sort((a, b) => a.name.localeCompare(b.name));
+    const excess = files.length - HISTORY_KEEP_COUNT;
+    for (let i = 0; i < excess; i++) {
+      await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${files[i].id}`, { method: 'DELETE' }).catch(() => {});
+    }
+  } catch (err) { console.error('drive history backup failed', err); }
+}
+
 async function pushDriveFiles() {
   if (!driveFilesFolderId) return;
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
-    const fname = fileNameFor(rec.id, rec.type);
+    const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
     const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
     const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
     const listData = await listRes.json();
@@ -2178,7 +2272,7 @@ async function pushDriveFiles() {
 async function cleanupDriveOrphanFiles() {
   if (!driveFilesFolderId) return;
   const referencedNames = new Set(
-    db.scores.filter(s => s.image_file_id).map(s => fileNameFor(s.image_file_id, s.image_type))
+    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
   );
   try {
     const q = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
@@ -2198,7 +2292,7 @@ async function importMissingDriveFiles(data) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
-    const fname = fileNameFor(score.image_file_id, score.image_type);
+    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     try {
       const q = encodeURIComponent(`name='${fname}' and '${driveFilesFolderId}' in parents and trashed=false`);
       const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
@@ -2254,7 +2348,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     }
 
     await pushDriveFiles();
-    await cleanupDriveOrphanFiles();
+    await backupDriveHistory();
     const data = await buildExportData();
     await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
       method: 'PATCH',
@@ -2270,6 +2364,145 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
   } finally {
     driveSyncInProgress = false;
     stopSyncSpin();
+  }
+}
+
+// ================== 未使用ファイルの管理 ==================
+async function getUnusedFileRecords() {
+  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const allFiles = await idbGetAll('files');
+  return allFiles.filter(rec => !referencedIds.has(rec.id));
+}
+
+async function renderUnusedFilesList() {
+  const container = document.getElementById('unused-files-list');
+  container.innerHTML = '<div class="empty">読み込み中…</div>';
+  const unused = await getUnusedFileRecords();
+  if (unused.length === 0) {
+    container.innerHTML = '<div class="empty">未使用のファイルはありません</div>';
+    return;
+  }
+  container.innerHTML = '';
+  unused.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  for (const rec of unused) {
+    const row = document.createElement('div');
+    row.className = 'concert-row';
+    const sizeKb = Math.round((rec.blob?.size || 0) / 1024);
+    row.innerHTML = `
+      <span>${escapeHtml(rec.fileName || rec.id)}<span class="count"> ・ ${sizeKb}KB</span></span>
+      <div class="actions"><button type="button" class="delete">削除</button></div>
+    `;
+    row.querySelector('.delete').addEventListener('click', async () => {
+      if (!confirm('このファイルを削除しますか？（この操作は取り消せません）')) return;
+      await idbDelete('files', rec.id);
+      fileUrlCache.delete(rec.id);
+      renderUnusedFilesList();
+    });
+    container.appendChild(row);
+  }
+}
+document.getElementById('unused-files-refresh-btn').addEventListener('click', renderUnusedFilesList);
+document.getElementById('unused-files-delete-all-btn').addEventListener('click', async () => {
+  const unused = await getUnusedFileRecords();
+  if (unused.length === 0) { alert('未使用のファイルはありません'); return; }
+  if (!confirm(`${unused.length}件の未使用ファイルをすべて削除しますか？この操作は取り消せません。`)) return;
+  for (const rec of unused) {
+    await idbDelete('files', rec.id);
+    fileUrlCache.delete(rec.id);
+  }
+  renderUnusedFilesList();
+});
+
+// ================== 同期履歴からの復元 ==================
+function formatHistoryLabel(name) {
+  const m = name.match(/data-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.json/);
+  if (!m) return name;
+  return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+}
+
+async function listLocalHistoryEntries() {
+  if (!syncDirHandle) return [];
+  try {
+    const historyDir = await syncDirHandle.getDirectoryHandle('history', { create: false }).catch(() => null);
+    if (!historyDir) return [];
+    const entries = [];
+    for await (const [name, handle] of historyDir.entries()) entries.push({ source: 'local', name, handle });
+    entries.sort((a, b) => b.name.localeCompare(a.name));
+    return entries;
+  } catch (err) { console.error('list local history failed', err); return []; }
+}
+
+async function listDriveHistoryEntries() {
+  if (!driveFolderId) return [];
+  try {
+    const historyFolderId = await findOrCreateDriveFolder('history', driveFolderId);
+    const q = encodeURIComponent(`'${historyFolderId}' in parents and trashed=false`);
+    const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+    const listData = await listRes.json();
+    const files = (listData.files || []).sort((a, b) => b.name.localeCompare(a.name));
+    return files.map(f => ({ source: 'drive', name: f.name, id: f.id }));
+  } catch (err) { console.error('list drive history failed', err); return []; }
+}
+
+async function renderSyncHistoryList() {
+  const container = document.getElementById('sync-history-list');
+  container.innerHTML = '<div class="empty">読み込み中…</div>';
+  const [localEntries, driveEntries] = await Promise.all([listLocalHistoryEntries(), listDriveHistoryEntries()]);
+  const all = [...localEntries, ...driveEntries];
+  if (all.length === 0) {
+    container.innerHTML = '<div class="empty">まだ履歴がありません（同期を設定していない、またはまだ一度も同期していない場合は履歴がありません）</div>';
+    return;
+  }
+  container.innerHTML = '';
+  for (const entry of all) {
+    const row = document.createElement('div');
+    row.className = 'concert-row';
+    row.innerHTML = `
+      <span>${escapeHtml(formatHistoryLabel(entry.name))}<span class="count"> ・ ${entry.source === 'local' ? 'フォルダ' : 'Google Drive'}</span></span>
+      <div class="actions"><button type="button" class="restore">この内容に戻す</button></div>
+    `;
+    row.querySelector('.restore').addEventListener('click', () => restoreFromHistoryEntry(entry));
+    container.appendChild(row);
+  }
+}
+document.getElementById('sync-history-refresh-btn').addEventListener('click', renderSyncHistoryList);
+
+async function restoreImportedDataFull(data) {
+  for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
+    const all = await idbGetAll(store);
+    for (const item of all) await idbDelete(store, item.id);
+  }
+  for (const table of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
+    for (const item of (data[table] || [])) await idbPut(table, item);
+  }
+  const existingTombstones = await idbGetAll('tombstones');
+  for (const t of existingTombstones) await idbDelete('tombstones', t.id);
+  for (const t of (data.tombstones || [])) await idbPut('tombstones', t);
+  fileUrlCache.clear();
+  await loadData();
+  if (syncFilesDirHandle) await importMissingLocalFiles(data);
+  if (driveFilesFolderId) await importMissingDriveFiles(data);
+  renderResults();
+  scheduleSync();
+}
+
+async function restoreFromHistoryEntry(entry) {
+  if (!confirm('この時点の内容に復元します。現在のデータは、この内容で置き換わります。実行しますか？')) return;
+  try {
+    let text;
+    if (entry.source === 'local') {
+      const file = await entry.handle.getFile();
+      text = await file.text();
+    } else {
+      const res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${entry.id}?alt=media`);
+      text = await res.text();
+    }
+    const data = JSON.parse(text);
+    await restoreImportedDataFull(data);
+    alert('復元しました');
+    showView('search');
+  } catch (err) {
+    alert('復元に失敗しました：' + err.message);
   }
 }
 
