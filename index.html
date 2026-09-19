@@ -388,7 +388,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.003</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.005</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -460,6 +460,7 @@ const I18N = {
     btn_load_history: '履歴を読み込む',
     sync_center_syncing: '更新中…',
     sync_unsupported_browser: 'このブラウザは自動同期に対応していません（メニューのエクスポート/インポートをご利用ください）',
+    sync_unsupported_mobile: 'スマートフォンでは「フォルダに保存」は使えません（ブラウザの仕様上の制限です）。他の端末とデータを共有したい場合は、「クラウドに保存」（実験的）か、メニューの「エクスポート/インポート」をご利用ください。',
     sync_configured: '設定済み：「{name}」フォルダ内で同期中',
     sync_not_set_hint: '未設定（Google Driveなどの同期フォルダ内にファイルを1つ選んでください）',
     drive_permission_pending: 'この機能は現在準備中です',
@@ -560,6 +561,7 @@ const I18N = {
     btn_load_history: 'Load History',
     sync_center_syncing: 'Syncing…',
     sync_unsupported_browser: 'This browser doesn\'t support automatic sync (use Export/Import from the menu instead)',
+    sync_unsupported_mobile: '"Save to Folder" isn\'t available on smartphones (this is a browser limitation). To share data with another device, use "Save to Cloud" (experimental) or Export/Import from the menu.',
     sync_configured: 'Configured: syncing inside the "{name}" folder',
     sync_not_set_hint: 'Not set (choose a file inside a sync folder such as Google Drive)',
     drive_permission_pending: 'This feature is not yet available',
@@ -1132,13 +1134,13 @@ const partError = document.getElementById('part-error');
 const titleError = document.getElementById('title-error');
 const saveBtn = document.getElementById('save-btn');
 
-function setupAutocomplete(inputEl, listEl, getOptions) {
+function setupAutocomplete(inputEl, listEl, getOptions, getLabel) {
   function render() {
     const q = inputEl.value.trim().toLowerCase();
     const options = getOptions();
     const matched = (q ? options.filter(name => name.toLowerCase().includes(q)) : options).slice(0, 8);
     if (matched.length === 0) { listEl.classList.remove('open'); listEl.innerHTML = ''; return; }
-    listEl.innerHTML = matched.map(name => `<div>${escapeHtml(name)}</div>`).join('');
+    listEl.innerHTML = matched.map(name => `<div data-value="${escapeHtml(name)}">${escapeHtml(getLabel ? getLabel(name) : name)}</div>`).join('');
     listEl.classList.add('open');
   }
   inputEl.addEventListener('focus', render);
@@ -1146,7 +1148,7 @@ function setupAutocomplete(inputEl, listEl, getOptions) {
   inputEl.addEventListener('blur', () => setTimeout(() => listEl.classList.remove('open'), 150));
   listEl.addEventListener('mousedown', (e) => {
     if (e.target.tagName !== 'DIV') return;
-    inputEl.value = e.target.textContent;
+    inputEl.value = e.target.dataset.value;
     listEl.classList.remove('open');
     inputEl.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -1158,7 +1160,9 @@ const performanceSection = document.getElementById('performance-section');
 const performanceListEl = document.getElementById('performance-list');
 const performanceNameInput = document.getElementById('performance-name');
 const performanceDateInput = document.getElementById('performance-date');
-setupAutocomplete(performanceNameInput, document.getElementById('concert-suggest'), () => db.concerts.map(c => c.name));
+setupAutocomplete(performanceNameInput, document.getElementById('concert-suggest'),
+  () => [...db.concerts].sort((a, b) => (b.concert_date || '').localeCompare(a.concert_date || '')).map(c => c.name),
+  (name) => { const c = db.concerts.find(x => x.name === name); return c && c.concert_date ? `${name}（${c.concert_date}）` : name; });
 let editingScoreId = null;
 let pendingPerformances = []; // 新規登録時、保存前に仮登録する演奏会（{concertName, concertDate}）
 
@@ -1331,7 +1335,7 @@ function loadImageEl(src) {
 }
 async function imagesToPdfFile(files) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt' });
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' }); // 保存されるPDFは常にA4サイズに統一する
   for (let i = 0; i < files.length; i++) {
     const dataUrl = await fileToDataUrl(files[i]);
     const img = await loadImageEl(dataUrl);
@@ -2151,7 +2155,8 @@ function refreshSyncUI() {
   const setupBtn = document.getElementById('sync-setup-btn');
   const nowBtn = document.getElementById('sync-now-btn');
   if (!supportsFSA) {
-    setSyncStatus(t('sync_unsupported_browser'));
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    setSyncStatus(isMobile ? t('sync_unsupported_mobile') : t('sync_unsupported_browser'));
     setupBtn.style.display = 'none';
     nowBtn.style.display = 'none';
     return;
