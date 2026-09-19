@@ -238,7 +238,7 @@
         </div>
       </div>
       <div class="field" style="border-top:1px solid var(--border); padding-top:12px;">
-        <label>パート名 *</label>
+        <label>パート名</label>
         <div class="autocomplete-wrap">
           <input type="text" id="f-part" autocomplete="off">
           <div class="autocomplete-list" id="part-suggest"></div>
@@ -365,7 +365,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.030</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v1.031</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -453,9 +453,11 @@ function makeSimpleMaster(table) {
       return db[table].find(x => x.name.trim() === norm) || null;
     },
     async addOrGet(name) {
+      const norm = (name || '').trim();
+      if (!norm) return null;
       const existing = this.findByName(name);
       if (existing) return existing;
-      const item = { id: genId(), name: name.trim(), created_at: nowIso() };
+      const item = { id: genId(), name: norm, created_at: nowIso() };
       await idbPut(table, item);
       db[table].push(item);
       return item;
@@ -480,7 +482,7 @@ async function addOrGetWork({ title, composer }) {
   const existing = findWorkByTitle(title);
   if (existing) return existing;
   const composerRow = await composerMaster.addOrGet(composer);
-  const work = { id: genId(), title: title.trim(), composer_id: composerRow.id, created_at: nowIso() };
+  const work = { id: genId(), title: title.trim(), composer_id: composerRow ? composerRow.id : null, created_at: nowIso() };
   await idbPut('works', work);
   db.works.push(work);
   return work;
@@ -490,7 +492,7 @@ async function updateWorkFields(workId, { title, composer }) {
   const work = db.works.find(w => w.id === workId);
   if (!work) return;
   work.title = title.trim();
-  work.composer_id = composerRow.id;
+  work.composer_id = composerRow ? composerRow.id : null;
   await idbPut('works', work);
 }
 
@@ -506,7 +508,7 @@ async function deleteImageFile(id) { if (id) await idbDelete('files', id); }
 
 async function addScore({ workId, partName, memo, imageFileId, imageType, imageFileName }) {
   const partRow = await partMaster.addOrGet(partName);
-  const score = { id: genId(), work_id: workId, part_id: partRow.id, memo: memo.trim(), image_file_id: imageFileId || null, image_type: imageType || null, image_file_name: imageFileName || null, created_at: nowIso() };
+  const score = { id: genId(), work_id: workId, part_id: partRow ? partRow.id : null, memo: memo.trim(), image_file_id: imageFileId || null, image_type: imageType || null, image_file_name: imageFileName || null, created_at: nowIso() };
   await idbPut('scores', score);
   db.scores.push(score);
   return score;
@@ -515,7 +517,7 @@ async function updateScore(scoreId, { partName, memo, imageFileId, imageType, im
   const partRow = await partMaster.addOrGet(partName);
   const score = db.scores.find(s => s.id === scoreId);
   if (!score) return;
-  score.part_id = partRow.id;
+  score.part_id = partRow ? partRow.id : null;
   score.memo = memo.trim();
   if (imageFileId) { score.image_file_id = imageFileId; score.image_type = imageType; score.image_file_name = imageFileName; }
   await idbPut('scores', score);
@@ -1334,7 +1336,6 @@ function resetForm() {
 
 document.getElementById('save-btn').addEventListener('click', async () => {
   let valid = true;
-  if (!fPart.value.trim()) { partError.style.display = 'block'; valid = false; } else { partError.style.display = 'none'; }
   if (!fTitle.value.trim()) { titleError.style.display = 'block'; fTitle.focus(); valid = false; } else { titleError.style.display = 'none'; }
   if (!valid) return;
 
