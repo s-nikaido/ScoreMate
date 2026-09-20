@@ -222,6 +222,13 @@
       </div>
       <div id="results"></div>
     </section>
+    <div id="export-bar" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:60; background:var(--surface); border-top:1px solid var(--border); padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <span id="export-bar-count" style="font-size:13px; color:var(--text-secondary);"></span>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="export-bar-clear-btn" style="padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text-secondary); font-size:13px; cursor:pointer;">選択解除</button>
+        <button type="button" id="export-bar-pdf-btn" style="padding:8px 14px; border:none; border-radius:var(--radius); background:var(--accent); color:var(--surface); font-size:13px; cursor:pointer;">PDFに書き出す</button>
+      </div>
+    </div>
 
     <section id="view-register" class="view">
       <label class="photo-input" id="photo-input-label">
@@ -478,7 +485,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.017</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.019</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -508,6 +515,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
@@ -618,6 +626,10 @@ const I18N = {
     sync_done: '同期済み：',
     loading_status: '読み込み中…',
     no_history_yet: 'まだ履歴がありません（同期を設定していない、またはまだ一度も同期していない場合は履歴がありません）',
+    export_selected_count: '{count}件選択中',
+    exporting_pdf_status: '作成中…',
+    export_no_pages: '出力できるファイルがありませんでした',
+    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す',
     source_folder: 'フォルダ', btn_restore_this: 'この内容に戻す',
     pdf_selected_status: 'PDFを選択しました：',
     skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
@@ -732,6 +744,10 @@ const I18N = {
     sync_done: 'Synced: ',
     loading_status: 'Loading…',
     no_history_yet: 'No history yet (this happens if sync isn\'t set up, or hasn\'t run yet)',
+    export_selected_count: '{count} selected',
+    exporting_pdf_status: 'Creating…',
+    export_no_pages: 'No files could be exported',
+    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF',
     source_folder: 'Folder', btn_restore_this: 'Restore This',
     pdf_selected_status: 'PDF selected: ',
     skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
@@ -1110,6 +1126,19 @@ const filterChipsEl = document.getElementById('filter-chips');
 const FILTERS = ['title', 'concert', 'part', 'composer'];
 let activeFilter = 'title';
 let drillDown = null;
+const selectedExportScoreIds = new Set();
+function refreshExportBar() {
+  const bar = document.getElementById('export-bar');
+  const count = selectedExportScoreIds.size;
+  bar.style.display = count > 0 ? 'flex' : 'none';
+  document.getElementById('export-bar-count').textContent = tf('export_selected_count', { count });
+}
+document.getElementById('export-bar-clear-btn').addEventListener('click', () => {
+  selectedExportScoreIds.clear();
+  refreshExportBar();
+  renderResults();
+});
+document.getElementById('export-bar-pdf-btn').addEventListener('click', exportSelectedScoresAsPdf);
 const GROUPABLE_FILTERS = ['title', 'concert', 'composer'];
 function isGroupingEnabled() { return localStorage.getItem('grouping_enabled') !== 'off'; }
 function refreshGroupingToggle() {
@@ -1176,6 +1205,7 @@ async function appendWorkCards(filteredList, container = resultsEl) {
         }
       }
       row.innerHTML = `
+        ${s.image_file_id ? `<input type="checkbox" class="export-check" data-score-id="${s.id}" style="width:auto; margin-right:6px;">` : ''}
         ${thumbHtml}
         <div class="info">
           <span class="part">${escapeHtml(partMaster.byId(s.part_id)?.name || t('unset_part'))}${latestConcertNameForScore(s.id) ? `<span class="loc"> ・ 直近: ${escapeHtml(latestConcertNameForScore(s.id))}</span>` : ''}</span>
@@ -1185,6 +1215,16 @@ async function appendWorkCards(filteredList, container = resultsEl) {
           <button class="delete" type="button">削除</button>
         </div>
       `;
+      const checkEl = row.querySelector('.export-check');
+      if (checkEl) {
+        if (selectedExportScoreIds.has(s.id)) checkEl.checked = true;
+        checkEl.addEventListener('click', (e) => e.stopPropagation());
+        checkEl.addEventListener('change', () => {
+          if (checkEl.checked) selectedExportScoreIds.add(s.id);
+          else selectedExportScoreIds.delete(s.id);
+          refreshExportBar();
+        });
+      }
       if (s.image_file_id) {
         row.querySelector('.thumb').addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -1195,7 +1235,7 @@ async function appendWorkCards(filteredList, container = resultsEl) {
       row.querySelector('.edit').addEventListener('click', (e) => { e.stopPropagation(); startEditScore(s.id); });
       row.querySelector('.delete').addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm(t('confirm_delete_score'))) deleteScore(s.id);
+        if (confirm(t('confirm_delete_score'))) { selectedExportScoreIds.delete(s.id); deleteScore(s.id); }
       });
       list.appendChild(row);
     }
@@ -1587,6 +1627,56 @@ async function imagesToPdfFile(files) {
   }
   const blob = doc.output('blob');
   return new File([blob], 'scan.pdf', { type: 'application/pdf' });
+}
+
+// ---- 選択した楽譜をまとめて1つのPDFに書き出す（印刷用） ----
+async function exportSelectedScoresAsPdf() {
+  const ids = [...selectedExportScoreIds];
+  if (ids.length === 0) return;
+  const btn = document.getElementById('export-bar-pdf-btn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = t('exporting_pdf_status');
+  try {
+    const { PDFDocument } = PDFLib;
+    const outDoc = await PDFDocument.create();
+    // 検索結果の並び順（曲名順）に合わせて出力する
+    const scoresInOrder = db.scores.filter(s => selectedExportScoreIds.has(s.id));
+    for (const score of scoresInOrder) {
+      const rec = await getImageFile(score.image_file_id);
+      if (!rec || !rec.blob) continue;
+      const bytes = await rec.blob.arrayBuffer();
+      if (isPdfType(rec.type)) {
+        const srcDoc = await PDFDocument.load(bytes);
+        const copiedPages = await outDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+        copiedPages.forEach(p => outDoc.addPage(p));
+      } else {
+        const isPng = (rec.type || '').includes('png');
+        const img = isPng ? await outDoc.embedPng(bytes) : await outDoc.embedJpg(bytes);
+        const pageWidth = 595.28, pageHeight = 841.89; // A4 (pt)
+        const ratio = Math.min(pageWidth / img.width, pageHeight / img.height);
+        const w = img.width * ratio, h = img.height * ratio;
+        const page = outDoc.addPage([pageWidth, pageHeight]);
+        page.drawImage(img, { x: (pageWidth - w) / 2, y: (pageHeight - h) / 2, width: w, height: h });
+      }
+    }
+    if (outDoc.getPageCount() === 0) { alert(t('export_no_pages')); return; }
+    const outBytes = await outDoc.save();
+    const outBlob = new Blob([outBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(outBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scoremate-export-${timestampForFilename()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (err) {
+    alert(t('export_failed') + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 // ---- 傾き・歪み補正 ----
@@ -2490,7 +2580,11 @@ document.getElementById('sync-setup-btn').addEventListener('click', async () => 
     syncLastModified = null;
     await saveSyncMeta();
     refreshSyncUI();
-    await performSync({ forceWrite: true });
+    // フォルダ側に既にデータがあるか確認する。あれば取り込むだけにし、
+    // この端末の（空かもしれない）状態で上書きしてしまわないようにする。
+    const existingFile = await dataFileHandle.getFile();
+    const existingText = await existingFile.text();
+    await performSync({ forceWrite: !existingText.trim() });
     setupSyncIntervalTimer();
   } catch (err) {
     if (err.name !== 'AbortError') alert(t('alert_setup_failed') + err.message);
@@ -3086,7 +3180,11 @@ document.getElementById('drive-connect-btn').addEventListener('click', async () 
     driveLastModified = null;
     await saveDriveMeta();
     refreshDriveUI();
-    await performDriveSync({ forceWrite: true });
+    // クラウド側に既にデータがあるか確認する。あれば取り込むだけにし、
+    // この端末の（空かもしれない）状態で上書きしてしまわないようにする。
+    const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+    const existingText = await contentRes.text();
+    await performDriveSync({ forceWrite: !existingText.trim() });
     setupSyncIntervalTimer();
   } catch (err) {
     setDriveStatus(t('drive_connect_failed') + err.message);
@@ -3486,6 +3584,9 @@ function applyTranslations() {
   document.getElementById('sync-history-refresh-btn').textContent = t('btn_load_history');
   document.getElementById('diagnostics-desc').textContent = t('diagnostics_desc');
   document.getElementById('diagnostics-run-btn').textContent = t('btn_run_diagnostics');
+  document.getElementById('export-bar-clear-btn').textContent = t('btn_clear_selection');
+  document.getElementById('export-bar-pdf-btn').textContent = t('btn_export_pdf');
+  refreshExportBar();
   document.getElementById('error-log-heading').textContent = t('error_log_heading');
   document.getElementById('error-log-clear-btn').textContent = t('btn_clear_log');
   document.getElementById('help-content-ja').style.display = getLanguage() === 'ja' ? 'block' : 'none';
