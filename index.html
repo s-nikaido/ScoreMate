@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.026</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.027</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -3290,7 +3290,27 @@ async function importMissingDriveFiles(data) {
   clearFileUrlCache();
 }
 
+// クラウドは常に1つだけ接続された状態にする（もう片方につなぎ直したら、前の接続は自動的に切る）
+async function disconnectDrive() {
+  driveAccessToken = null;
+  driveFolderId = null;
+  driveFilesFolderId = null;
+  driveFileId = null;
+  driveLastModified = null;
+  await saveDriveMeta();
+  refreshDriveUI();
+}
+async function disconnectDropbox() {
+  dropboxAccessToken = null;
+  dropboxRefreshToken = null;
+  dropboxTokenExpiresAt = 0;
+  dropboxConnected = false;
+  await saveDropboxMeta();
+  refreshDropboxUI();
+}
+
 document.getElementById('drive-connect-btn').addEventListener('click', async () => {
+  if (dropboxConnected) await disconnectDropbox();
   const ok = await requestDriveToken({ silent: false });
   if (!ok) return;
   setDriveStatus(t('drive_connecting'));
@@ -3680,6 +3700,7 @@ async function backupDropboxHistory() {
 }
 
 document.getElementById('dropbox-connect-btn').addEventListener('click', async () => {
+  if (driveFileId) await disconnectDrive();
   // 古い接続情報が残っていると失敗の原因になるため、つなぎ直す前に必ずクリアする
   dropboxAccessToken = null;
   dropboxRefreshToken = null;
