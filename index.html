@@ -399,7 +399,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.010</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.011</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -1093,7 +1093,7 @@ async function appendWorkCards(filteredList, container = resultsEl) {
     header.addEventListener('click', () => list.classList.toggle('open'));
     card.appendChild(header);
     card.appendChild(list);
-    resultsEl.appendChild(card);
+    container.appendChild(card);
   }
 }
 
