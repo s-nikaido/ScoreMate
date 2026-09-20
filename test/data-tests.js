@@ -131,6 +131,49 @@ async function main() {
     assert.strictEqual(fixedWork.composer_id, null, '修復後は参照がnullになること');
   });
 
+  await test('旧バージョン（storeが一部無い状態）からのアップグレードでデータが保持される', async () => {
+    const FDBFactory = require('fake-indexeddb/lib/FDBFactory');
+    const factory = new FDBFactory();
+
+    // 1. 「tombstonesストアが無い旧バージョン(v2)」を疑似的に用意し、データを1件入れておく
+    await new Promise((resolve, reject) => {
+      const req = factory.open('scoremate', 2);
+      req.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files', 'meta'].forEach(name => {
+          if (!d.objectStoreNames.contains(name)) d.createObjectStore(name, { keyPath: 'id' });
+        });
+      };
+      req.onsuccess = () => {
+        const idbConn = req.result;
+        const tx = idbConn.transaction('works', 'readwrite');
+        tx.objectStore('works').put({ id: 'legacy-work-1', title: '旧バージョンの曲', composer_id: null, created_at: '2020-01-01' });
+        tx.oncomplete = () => { idbConn.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // 2. アプリ（現行バージョン）を、この続きから開かせる
+    const dom2 = new JSDOM(html, {
+      runScripts: 'dangerously',
+      url: 'https://example.com/',
+      pretendToBeVisual: true,
+      beforeParse(window) { window.indexedDB = factory; },
+    });
+    const w2 = dom2.window;
+    await new Promise(resolve => {
+      if (w2.document.readyState === 'complete') resolve();
+      else w2.addEventListener('load', resolve);
+    });
+    await new Promise(r => setTimeout(r, 300));
+    w2.eval('window.db = db;');
+
+    assert.ok(w2.db.works.find(x => x.id === 'legacy-work-1'), '旧バージョンからのデータが引き継がれていること');
+    const putResult = await w2.idbPut('tombstones', { id: 'migration-test', table: 'works', recordId: 'x', deletedAt: new Date().toISOString() });
+    assert.ok(putResult, '新しいバージョンで追加されたストアが使えること');
+  });
+
   console.log(`\n合計: ${passed}件成功 / ${failed}件失敗`);
   process.exit(failed > 0 ? 1 : 0);
 }
