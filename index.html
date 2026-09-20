@@ -539,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.035</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.036</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -1450,10 +1450,10 @@ function renderGroupedComposers() {
   }
 }
 
-async function renderDrillDownList() {
+async function renderDrillDownList(query = '') {
   renderBackButton(() => { drillDown = null; renderResults(); }, drillDown.name);
   if (drillDown.type === 'concert') {
-    await renderConcertProgramList();
+    await renderConcertProgramList(query);
     return;
   }
   let filterFn;
@@ -1462,7 +1462,8 @@ async function renderDrillDownList() {
   } else {
     filterFn = (work, scores) => scores.some(s => s.part_id === drillDown.id);
   }
-  const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => filterFn(work, scores));
+  const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) }))
+    .filter(({ work, scores }) => filterFn(work, scores) && matches(work, scores, query));
   if (filtered.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty';
@@ -1485,10 +1486,11 @@ async function renderDrillDownList() {
 }
 
 // 演奏会の中の曲順を、ドラッグで並べ替えられる形で表示する
-async function renderConcertProgramList() {
+async function renderConcertProgramList(query = '') {
   const worksInConcert = db.works
     .map(w => ({ work: w, scores: scoresForWork(w.id) }))
-    .filter(({ scores }) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id)));
+    .filter(({ scores }) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id)))
+    .filter(({ work, scores }) => matches(work, scores, query));
   if (worksInConcert.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty';
@@ -1502,15 +1504,20 @@ async function renderConcertProgramList() {
   };
   worksInConcert.sort((a, b) => orderOf(a.work.id) - orderOf(b.work.id));
 
-  const hint = document.createElement('p');
-  hint.textContent = t('program_reorder_hint');
-  hint.style.cssText = 'font-size:12px; color:var(--text-muted); margin:0 0 8px;';
-  resultsEl.appendChild(hint);
+  // 検索で絞り込み中は、表示されていない曲まで巻き込んで順序が壊れないよう、ドラッグ並べ替えを一時的に無効にする
+  const searching = !!query;
+  if (!searching) {
+    const hint = document.createElement('p');
+    hint.textContent = t('program_reorder_hint');
+    hint.style.cssText = 'font-size:12px; color:var(--text-muted); margin:0 0 8px;';
+    resultsEl.appendChild(hint);
+  }
 
   const list = document.createElement('div');
   list.id = 'concert-program-list';
   resultsEl.appendChild(list);
-  await appendWorkCards(worksInConcert, list, { dragHandle: true });
+  await appendWorkCards(worksInConcert, list, { dragHandle: !searching });
+  if (searching) return;
 
   new Sortable(list, {
     handle: '.drag-handle',
@@ -1536,7 +1543,7 @@ async function renderResults() {
   resultsEl.innerHTML = '';
   refreshGroupingToggle();
   if (activeFilter === 'concert' || activeFilter === 'composer' || activeFilter === 'part') {
-    if (drillDown && drillDown.type === activeFilter) await renderDrillDownList();
+    if (drillDown && drillDown.type === activeFilter) await renderDrillDownList(query);
     else renderMasterCardList();
     return;
   }
