@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.027</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.028</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -2644,12 +2644,13 @@ function refreshSyncUI() {
 // ---- ヘッダーの同期ボタン ----
 const syncHeaderBtn = document.getElementById('sync-now-header-btn');
 syncHeaderBtn.addEventListener('click', async () => {
-  if (!syncHandle && !driveFileId) {
+  if (!syncHandle && !driveFileId && !dropboxConnected) {
     alert(t('alert_need_sync_target'));
     return;
   }
   if (syncHandle) await performSync({ manual: true });
   if (driveFileId) await performDriveSync({ manual: true });
+  if (dropboxConnected) await performDropboxSync({ manual: true });
 });
 
 // ---- 自動同期の間隔設定 ----
