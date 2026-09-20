@@ -485,7 +485,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.019</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.020</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -516,6 +516,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
@@ -629,7 +630,7 @@ const I18N = {
     export_selected_count: '{count}件選択中',
     exporting_pdf_status: '作成中…',
     export_no_pages: '出力できるファイルがありませんでした',
-    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す',
+    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す', program_reorder_hint: '左のハンドル（⠿）をドラッグすると、この演奏会内での曲順を変更できます。',
     source_folder: 'フォルダ', btn_restore_this: 'この内容に戻す',
     pdf_selected_status: 'PDFを選択しました：',
     skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
@@ -747,7 +748,7 @@ const I18N = {
     export_selected_count: '{count} selected',
     exporting_pdf_status: 'Creating…',
     export_no_pages: 'No files could be exported',
-    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF',
+    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF', program_reorder_hint: 'Drag the handle (⠿) on the left to reorder the pieces in this concert.',
     source_folder: 'Folder', btn_restore_this: 'Restore This',
     pdf_selected_status: 'PDF selected: ',
     skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
@@ -1021,7 +1022,8 @@ async function mergeConcertInto(sourceId, targetId) {
 function performanceCountForConcert(id) { return db.performances.filter(p => p.concert_id === id).length; }
 async function addPerformance({ scoreId, concertName, concertDate }) {
   const concert = await addOrGetConcert({ name: concertName, date: concertDate });
-  const perf = { id: genId(), score_id: scoreId, concert_id: concert.id, created_at: nowIso() };
+  const existingMax = Math.max(-1, ...db.performances.filter(p => p.concert_id === concert.id).map(p => p.sort_order ?? 0));
+  const perf = { id: genId(), score_id: scoreId, concert_id: concert.id, created_at: nowIso(), sort_order: existingMax + 1 };
   await idbPut('performances', perf);
   db.performances.push(perf);
   markChanged('performances', perf.id);
@@ -1177,16 +1179,20 @@ function matches(work, scores, query) {
   return (work.title || '').toLowerCase().includes(query.toLowerCase());
 }
 
-async function appendWorkCards(filteredList, container = resultsEl) {
+async function appendWorkCards(filteredList, container = resultsEl, options = {}) {
   for (const { work, scores } of filteredList) {
     const card = document.createElement('div');
     card.className = 'work-card';
+    if (options.dragHandle) card.dataset.workId = work.id;
     const header = document.createElement('div');
     header.className = 'work-header';
     header.innerHTML = `
-      <div>
-        <p class="title">${escapeHtml(work.title)}</p>
-        <p class="sub">${escapeHtml(composerMaster.byId(work.composer_id)?.name || t('unset_composer'))}</p>
+      <div style="display:flex; align-items:center; gap:8px;">
+        ${options.dragHandle ? `<span class="drag-handle" style="cursor:grab; color:var(--text-muted); padding:4px; touch-action:none;">⠿</span>` : ''}
+        <div>
+          <p class="title">${escapeHtml(work.title)}</p>
+          <p class="sub">${escapeHtml(composerMaster.byId(work.composer_id)?.name || t('unset_composer'))}</p>
+        </div>
       </div>
       <span class="count">${scores.length}件</span>
     `;
@@ -1240,6 +1246,8 @@ async function appendWorkCards(filteredList, container = resultsEl) {
       list.appendChild(row);
     }
     header.addEventListener('click', () => list.classList.toggle('open'));
+    const handleEl = header.querySelector('.drag-handle');
+    if (handleEl) handleEl.addEventListener('click', (e) => e.stopPropagation());
     card.appendChild(header);
     card.appendChild(list);
     container.appendChild(card);
@@ -1349,10 +1357,12 @@ function renderGroupedComposers() {
 
 async function renderDrillDownList() {
   renderBackButton(() => { drillDown = null; renderResults(); }, drillDown.name);
-  let filterFn;
   if (drillDown.type === 'concert') {
-    filterFn = (work, scores) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id));
-  } else if (drillDown.type === 'composer') {
+    await renderConcertProgramList();
+    return;
+  }
+  let filterFn;
+  if (drillDown.type === 'composer') {
     filterFn = (work) => work.composer_id === drillDown.id;
   } else {
     filterFn = (work, scores) => scores.some(s => s.part_id === drillDown.id);
@@ -1366,6 +1376,53 @@ async function renderDrillDownList() {
     return;
   }
   await appendWorkCards(filtered);
+}
+
+// 演奏会の中の曲順を、ドラッグで並べ替えられる形で表示する
+async function renderConcertProgramList() {
+  const worksInConcert = db.works
+    .map(w => ({ work: w, scores: scoresForWork(w.id) }))
+    .filter(({ scores }) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id)));
+  if (worksInConcert.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = t('empty_no_matches');
+    resultsEl.appendChild(empty);
+    return;
+  }
+  const orderOf = (workId) => {
+    const perfs = db.performances.filter(p => p.concert_id === drillDown.id && scoresForWork(workId).some(s => s.id === p.score_id));
+    return Math.min(...perfs.map(p => p.sort_order ?? 0));
+  };
+  worksInConcert.sort((a, b) => orderOf(a.work.id) - orderOf(b.work.id));
+
+  const hint = document.createElement('p');
+  hint.textContent = t('program_reorder_hint');
+  hint.style.cssText = 'font-size:12px; color:var(--text-muted); margin:0 0 8px;';
+  resultsEl.appendChild(hint);
+
+  const list = document.createElement('div');
+  list.id = 'concert-program-list';
+  resultsEl.appendChild(list);
+  await appendWorkCards(worksInConcert, list, { dragHandle: true });
+
+  new Sortable(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: async () => {
+      const newOrderWorkIds = [...list.children].map(el => el.dataset.workId);
+      for (let i = 0; i < newOrderWorkIds.length; i++) {
+        const workId = newOrderWorkIds[i];
+        const perfs = db.performances.filter(p => p.concert_id === drillDown.id && scoresForWork(workId).some(s => s.id === p.score_id));
+        for (const p of perfs) {
+          p.sort_order = i;
+          await idbPut('performances', p);
+          markChanged('performances', p.id);
+        }
+      }
+      scheduleSync();
+    },
+  });
 }
 
 async function renderResults() {
