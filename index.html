@@ -399,7 +399,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.011</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.012</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -3473,7 +3473,8 @@ document.getElementById('diagnostics-run-btn').addEventListener('click', renderD
     setupSyncIntervalTimer();
   }
   if (driveFileId) {
-    await performDriveSync();
+    // 起動時は自動同期しない（毎回Googleの再認証ポップアップが出るのを避けるため）。
+    // 変更時（scheduleSync）と定期同期のタイミングでのみ同期する。
     setupSyncIntervalTimer();
   }
 })();
