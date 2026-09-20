@@ -89,14 +89,26 @@
     display: none; position: absolute; top: 40px; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     min-width: 160px; padding: 6px 0; z-index: 5;
+    max-height: calc(100vh - 70px); overflow-y: auto;
   }
   .menu-dropdown.open { display: block; }
   .menu-dropdown button {
-    display: block; width: 100%; text-align: left; padding: 9px 14px; border: none; background: none;
+    display: block; width: 100%; text-align: left; padding: 7px 14px; border: none; background: none;
     font-family: var(--font-serif); font-size: 14px; color: var(--text); cursor: pointer;
   }
   .menu-dropdown button:hover { background: var(--bg); }
-  .menu-divider { height: 1px; background: var(--border); margin: 6px 0; }
+  .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .menu-group-toggle {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 100%; text-align: left; padding: 7px 14px; border: none; background: none;
+    font-family: var(--font-serif); font-size: 13px; color: var(--text-secondary); cursor: pointer;
+  }
+  .menu-group-toggle:hover { background: var(--bg); }
+  .menu-group-toggle .arrow { transition: transform 0.15s; font-size: 11px; }
+  .menu-group-toggle.open .arrow { transform: rotate(90deg); }
+  .menu-group-body { display: none; }
+  .menu-group-body.open { display: block; }
+  .menu-group-body button { padding-left: 26px; }
 
   main { flex: 1; padding: 16px; overflow-y: auto; }
   .search-sticky { position: sticky; top: -16px; margin: -16px -16px 0; padding: 16px 16px 8px; background: var(--surface); z-index: 2; }
@@ -194,18 +206,27 @@
         <div class="menu-dropdown" id="menu-dropdown">
           <button type="button" data-view="search">検索</button>
           <button type="button" data-view="register">登録</button>
-          <button type="button" data-view="concerts">演奏会</button>
-          <button type="button" data-view="composers">作曲家</button>
-          <button type="button" data-view="parts">パート</button>
+          <div class="menu-divider"></div>
+          <button type="button" class="menu-group-toggle" data-group="master" id="menu-label-master"><span>マスタ管理</span><span class="arrow">▸</span></button>
+          <div class="menu-group-body" id="menu-group-master">
+            <button type="button" data-view="concerts">演奏会</button>
+            <button type="button" data-view="composers">作曲家</button>
+            <button type="button" data-view="parts">パート</button>
+          </div>
+          <div class="menu-divider"></div>
+          <button type="button" class="menu-group-toggle" data-group="data" id="menu-label-data"><span>データ管理</span><span class="arrow">▸</span></button>
+          <div class="menu-group-body" id="menu-group-data">
+            <button type="button" data-view="unused-files">未使用ファイル</button>
+            <button type="button" data-view="sync-history">同期履歴</button>
+            <button type="button" data-view="diagnostics" id="menu-diagnostics">データ診断</button>
+            <button type="button" id="export-btn">エクスポート（バックアップ）</button>
+            <button type="button" id="full-export-btn">完全エクスポート</button>
+            <button type="button" id="import-btn">インポート（復元）</button>
+            <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+          </div>
           <div class="menu-divider"></div>
           <button type="button" data-view="settings">設定</button>
-          <button type="button" data-view="unused-files">未使用ファイル</button>
-          <button type="button" data-view="sync-history">同期履歴</button>
-          <button type="button" data-view="diagnostics" id="menu-diagnostics">データ診断</button>
           <button type="button" data-view="help" id="menu-help">ヘルプ</button>
-          <button type="button" id="export-btn">エクスポート（バックアップ）</button>
-          <button type="button" id="import-btn">インポート（復元）</button>
-          <input type="file" id="import-file-input" accept="application/json" style="display:none;">
         </div>
       </div>
     </div>
@@ -428,11 +449,22 @@
       <div id="help-content-ja">
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">基本的な使い方</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
-          「登録」から写真を撮影・選択して楽譜を登録します。曲名は必須、作曲家・パートは空欄でも登録できます。複数枚の写真を選ぶと自動的に1つのPDFにまとめられます。「検索」画面では曲名・演奏会・作曲家・パートで絞り込めます（曲名・演奏会・作曲家タブは頭文字や年でグループ表示され、「全て表示」に切り替えも可能です）。
+          「登録」から写真を撮影・選択して楽譜を登録します。曲名は必須、作曲家・パートは空欄でも登録できます。複数枚の写真を選ぶと自動的に1つのPDFにまとめられます。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">検索画面の4つのタブ</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          <b>曲名</b>：登録した楽曲を曲名の頭文字でグループ表示します（「全て表示」に切替可）。<br>
+          <b>演奏会</b>：演奏会（開催年でグループ表示）を選ぶと、その演奏会で演奏した曲の一覧が、ドラッグ（左の「⠿」）で並べ替えできる形で表示されます。プログラム順の管理や、PDF一括出力の並び用に使えます。<br>
+          <b>作曲家</b>：作曲家（頭文字・邦人でグループ表示）を選ぶと、その作曲家の曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。<br>
+          <b>パート</b>：パートを選ぶと、そのパートの楽譜がある曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">印刷用PDFの一括出力</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          検索結果で楽譜のチェックボックスを選ぶと、画面下に選択件数と「PDFに書き出す」ボタンが表示されます。選んだ楽譜（画像・PDF混在可）をまとめて1つのPDFに結合してダウンロードできます。
         </p>
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">データの保存場所について</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
-          登録したデータはこの端末（ブラウザ）の中に保存されます。他の端末と共有したい場合は、「設定」画面から「フォルダに保存」（PCのみ）または「クラウドに保存」（Google Drive・実験的機能）を設定してください。スマートフォンでは「フォルダに保存」は使えません。
+          登録したデータはこの端末（ブラウザ）の中に保存されます。他の端末と共有したい場合は、「設定」画面から「フォルダに保存」（PCのみ）または「クラウドに保存」（Google Drive・Dropbox、いずれも実験的機能）を設定してください。クラウドは常にどちらか一方のみ接続されます（つなぎ直すと、もう片方は自動的に切断されます）。スマートフォンでは「フォルダに保存」は使えません。同期のたびに、同期先には検索用の「index.csv」も自動保存されます。万一ScoreMateが使えない状況でも、Excel等で登録内容を確認できます。
         </p>
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">同期の仕組み（重要）</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
@@ -462,11 +494,22 @@
       <div id="help-content-en" style="display:none;">
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Basic Usage</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
-          Use "Add" to photograph or select a score. A title is required; composer and part can be left blank. Multiple photos are automatically combined into one PDF. In "Search", you can filter by title, concert, composer, or part (title/concert/composer tabs are grouped by initial letter or year, and you can switch to "Show All").
+          Use "Add" to photograph or select a score. A title is required; composer and part can be left blank. Multiple photos are automatically combined into one PDF.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">The 4 Search Tabs</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          <b>Title</b>: Scores grouped by the first letter of the title (switch to "Show All" anytime).<br>
+          <b>Concert</b>: Concerts are grouped by year. Pick one to see its program — drag the "⠿" handle on the left to reorder the pieces, useful for managing the running order or the order of a bulk PDF export.<br>
+          <b>Composer</b>: Composers are grouped by initial letter / Japanese composers. Pick one to see their works, grouped by title's first letter ("Show All" available).<br>
+          <b>Part</b>: Pick a part to see works that have a score for it, grouped by title's first letter ("Show All" available).
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Bulk PDF Export for Printing</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          Check the boxes next to scores in search results — a bar with a selection count and "Export as PDF" appears at the bottom. It combines the selected scores (images and PDFs can be mixed) into a single downloadable PDF.
         </p>
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Where Your Data Is Stored</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
-          Your data is stored on this device (in your browser). To share it with another device, set up "Save to Folder" (PC only) or "Save to Cloud" (Google Drive, experimental) in Settings. "Save to Folder" is not available on smartphones.
+          Your data is stored on this device (in your browser). To share it with another device, set up "Save to Folder" (PC only) or "Save to Cloud" (Google Drive or Dropbox, both experimental) in Settings. Only one cloud service is ever connected at a time — connecting a new one automatically disconnects the other. "Save to Folder" is not available on smartphones. Every sync also saves a searchable "index.csv" to the sync destination, so you can check what's registered in Excel or similar even if ScoreMate itself is unavailable.
         </p>
         <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">How Sync Works (Important)</p>
         <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
@@ -496,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.029</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.035</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -528,6 +571,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
@@ -535,8 +579,8 @@
 const I18N = {
   ja: {
     menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
-    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断', menu_help: 'ヘルプ',
-    menu_export: 'エクスポート（バックアップ）', menu_import: 'インポート（復元）',
+    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断', menu_help: 'ヘルプ', menu_label_master: 'マスタ管理', menu_label_data: 'データ管理',
+    menu_export: 'エクスポート（バックアップ）', menu_full_export: '完全エクスポート', menu_import: 'インポート（復元）', alert_full_export_failed: '完全エクスポートに失敗しました：',
     search_placeholder: '検索',
     filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
     label_title: '曲名 *', label_composer: '作曲家', label_part: 'パート名', label_memo: 'メモ',
@@ -653,8 +697,8 @@ const I18N = {
   },
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
-    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics', menu_help: 'Help',
-    menu_export: 'Export (Backup)', menu_import: 'Import (Restore)',
+    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics', menu_help: 'Help', menu_label_master: 'Master Data', menu_label_data: 'Data Management',
+    menu_export: 'Export (Backup)', menu_full_export: 'Full Export', menu_import: 'Import (Restore)', alert_full_export_failed: 'Full export failed: ',
     search_placeholder: 'Search',
     filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
     label_title: 'Title *', label_composer: 'Composer', label_part: 'Part', label_memo: 'Notes',
@@ -1140,6 +1184,13 @@ function showView(name) {
 }
 menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menuDropdown.classList.toggle('open'); });
 document.addEventListener('click', () => menuDropdown.classList.remove('open'));
+document.querySelectorAll('.menu-group-toggle').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    btn.classList.toggle('open');
+    document.getElementById('menu-group-' + btn.dataset.group).classList.toggle('open');
+  });
+});
 document.querySelectorAll('.menu-dropdown button[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
     const view = btn.dataset.view;
@@ -1176,11 +1227,20 @@ document.getElementById('export-bar-clear-btn').addEventListener('click', () => 
   renderResults();
 });
 document.getElementById('export-bar-pdf-btn').addEventListener('click', exportSelectedScoresAsPdf);
-const GROUPABLE_FILTERS = ['title', 'concert', 'composer'];
 function isGroupingEnabled() { return localStorage.getItem('grouping_enabled') !== 'off'; }
+function groupingToggleApplicable() {
+  if (activeFilter === 'title') return true; // 曲名タブ：常に頭文字でグループ化可能
+  const drilledIn = drillDown && drillDown.type === activeFilter;
+  if (drilledIn) {
+    // ドリルダウン画面：演奏会は曲順管理のため対象外。作曲家・パートは曲名頭文字でグループ化可能
+    return activeFilter === 'composer' || activeFilter === 'part';
+  }
+  // 上位一覧画面：演奏会（開催年）・作曲家（頭文字/邦人）はグループ化可能。パートは対象外
+  return activeFilter === 'concert' || activeFilter === 'composer';
+}
 function refreshGroupingToggle() {
   const btn = document.getElementById('grouping-toggle-btn');
-  if (!GROUPABLE_FILTERS.includes(activeFilter)) { btn.style.display = 'none'; return; }
+  if (!groupingToggleApplicable()) { btn.style.display = 'none'; return; }
   btn.style.display = 'inline-block';
   btn.textContent = isGroupingEnabled() ? t('btn_show_all') : t('btn_show_grouped');
 }
@@ -1410,7 +1470,18 @@ async function renderDrillDownList() {
     resultsEl.appendChild(empty);
     return;
   }
-  await appendWorkCards(filtered);
+  filtered.sort((a, b) => a.work.title.localeCompare(b.work.title, 'ja'));
+  if (!isGroupingEnabled()) { await appendWorkCards(filtered); return; }
+  const groups = new Map();
+  for (const item of filtered) {
+    const key = (item.work.title.trim()[0] || '').toUpperCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  for (const [key, list] of groups) {
+    const body = createCollapsibleGroup(key, list.length + '件');
+    await appendWorkCards(list, body);
+  }
 }
 
 // 演奏会の中の曲順を、ドラッグで並べ替えられる形で表示する
@@ -2740,6 +2811,90 @@ async function buildExportData() {
   };
 }
 
+// ================== 完全エクスポート（ScoreMate外へのデータ持ち出し） ==================
+const FULL_EXPORT_FORMAT_VERSION = 1;
+function csvField(value) {
+  const s = (value === null || value === undefined) ? '' : String(value);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function currentAppVersion() {
+  const m = document.querySelector('.app-footer').textContent.match(/v[\d.]+/);
+  return m ? m[0].replace(/^v/, '') : '';
+}
+function buildFullExportIndexCsv() {
+  const header = ['曲名', '作曲者', 'パート', '演奏会', '演奏会日', 'PDF/ファイル名', 'ファイル形式', 'ファイルID', '作品ID', '作曲者ID', 'パートID', '演奏会ID'];
+  const rows = [header];
+  for (const score of db.scores) {
+    const work = db.works.find(w => w.id === score.work_id);
+    const composer = work ? composerMaster.byId(work.composer_id) : null;
+    const part = partMaster.byId(score.part_id);
+    const perfs = performancesForScore(score.id).map(p => concertById(p.concert_id)).filter(Boolean);
+    const concertNames = perfs.map(c => c.name).join('; ');
+    const concertDates = perfs.map(c => c.concert_date || '').join('; ');
+    const concertIds = perfs.map(c => c.id).join('; ');
+    const fname = score.image_file_name || (score.image_file_id ? fileNameFor(score.image_file_id, score.image_type, score.created_at) : '');
+    rows.push([
+      work ? work.title : '', composer ? composer.name : '', part ? part.name : '',
+      concertNames, concertDates, fname, score.image_type || '',
+      score.image_file_id || '', score.work_id || '', work ? (work.composer_id || '') : '', score.part_id || '', concertIds,
+    ]);
+  }
+  return rows.map(r => r.map(csvField).join(',')).join('\r\n');
+}
+async function performFullExport() {
+  const btn = document.getElementById('full-export-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t('exporting_pdf_status');
+  try {
+    const data = await buildExportData();
+    const manifest = {
+      format: 'ScoreMateExport',
+      formatVersion: FULL_EXPORT_FORMAT_VERSION,
+      exportedAt: nowIso(),
+      applicationVersion: currentAppVersion(),
+      workCount: db.works.length,
+      composerCount: db.composers.length,
+      partCount: db.parts.length,
+      concertCount: db.concerts.length,
+      fileCount: db.scores.filter(s => s.image_file_id).length,
+    };
+    const indexCsv = buildFullExportIndexCsv();
+
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    zip.file('data.json', JSON.stringify(data, null, 2));
+    zip.file('index.csv', '\uFEFF' + indexCsv); // Excelでの文字化け対策でBOMを付与
+    const filesFolder = zip.folder('files');
+    const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+    for (const id of referencedIds) {
+      const rec = await idbGet('files', id).catch(() => null);
+      if (!rec || !rec.blob) continue;
+      const score = db.scores.find(s => s.image_file_id === id);
+      const fname = rec.fileName || (score && score.image_file_name) || fileNameFor(id, rec.type, rec.created_at);
+      filesFolder.file(fname, rec.blob);
+    }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ScoreMate_Export_${timestampForFilename().replace('-', '_')}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (err) {
+    logError('full export failed: ' + err.message);
+    alert(t('alert_full_export_failed') + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+document.getElementById('full-export-btn').addEventListener('click', performFullExport);
+
 // クラウドの最新データに、この端末で変更した項目「だけ」を重ねて適用する。
 // クラウド側で他端末が加えた変更（この端末が知らないもの）はそのまま残る。
 async function applyRemoteWithLocalOverlay(remoteData) {
@@ -2972,6 +3127,13 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     const writable = await syncHandle.createWritable();
     await writable.write(JSON.stringify(data));
     await writable.close();
+    // 緊急時（アプリが使えない場合）にExcel等で内容を確認できるよう、検索用CSVも一緒に保存しておく
+    try {
+      const csvHandle = await syncDirHandle.getFileHandle('index.csv', { create: true });
+      const csvWritable = await csvHandle.createWritable();
+      await csvWritable.write('\uFEFF' + buildFullExportIndexCsv());
+      await csvWritable.close();
+    } catch (err) { console.error('local sync csv write failed', err); }
     await saveSyncMeta();
     clearPendingChanges();
     setSyncStatus(t('sync_done') + new Date().toLocaleTimeString());
@@ -3145,6 +3307,37 @@ async function findOrCreateDriveDataFile(parentId) {
   });
   const created = await createRes.json();
   return created.id;
+}
+
+// 指定フォルダ直下に、名前を指定してテキストファイルを書き込む（無ければ作成、あれば上書き）
+async function writeDriveTextFile(parentId, fname, text, mimeType) {
+  const q = encodeURIComponent(`name='${fname}' and '${parentId}' in parents and trashed=false`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const listData = await listRes.json();
+  const existingId = (listData.files && listData.files[0]) ? listData.files[0].id : null;
+  if (existingId) {
+    await driveApiFetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': mimeType },
+      body: text,
+    });
+    return;
+  }
+  const boundary = 'scoremate' + Date.now();
+  const metadata = { name: fname, parents: [parentId] };
+  const body =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(metadata) + `\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: ${mimeType}\r\n\r\n` +
+    text + `\r\n` +
+    `--${boundary}--`;
+  await driveApiFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
 }
 
 async function findOrCreateDriveStructure() {
@@ -3424,6 +3617,8 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    // 緊急時（アプリが使えない場合）にExcel等で内容を確認できるよう、検索用CSVも一緒に保存しておく
+    await writeDriveTextFile(driveFolderId, 'index.csv', '\uFEFF' + buildFullExportIndexCsv(), 'text/csv').catch(err => console.error('drive sync csv write failed', err));
     await saveDriveMeta();
     clearPendingChanges();
     setDriveStatus(t('sync_done') + new Date().toLocaleTimeString());
@@ -3772,6 +3967,8 @@ async function performDropboxSync({ forceWrite = false, manual = false } = {}) {
     await backupDropboxHistory();
     const data = await buildExportData();
     await dropboxUpload(DROPBOX_DATA_PATH, JSON.stringify(data));
+    // 緊急時（アプリが使えない場合）にExcel等で内容を確認できるよう、検索用CSVも一緒に保存しておく
+    await dropboxUpload('/index.csv', '\uFEFF' + buildFullExportIndexCsv()).catch(err => console.error('dropbox sync csv write failed', err));
     dropboxConnected = true;
     await saveDropboxMeta();
     clearPendingChanges();
@@ -4023,7 +4220,10 @@ function applyTranslations() {
     if (key) btn.textContent = t(key);
   });
   document.getElementById('export-btn').textContent = t('menu_export');
+  document.getElementById('full-export-btn').textContent = t('menu_full_export');
   document.getElementById('import-btn').textContent = t('menu_import');
+  document.querySelector('#menu-label-master span').textContent = t('menu_label_master');
+  document.querySelector('#menu-label-data span').textContent = t('menu_label_data');
   searchInput.placeholder = t('search_placeholder');
   renderFilterChips();
 
