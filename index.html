@@ -539,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.037</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.038</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -1331,7 +1331,9 @@ async function appendWorkCards(filteredList, container = resultsEl, options = {}
         row.querySelector('.thumb').addEventListener('click', async (e) => {
           e.stopPropagation();
           const url = await getFileUrl(s.image_file_id);
-          window.open(url, '_blank');
+          // スマホは新しいタブでblob URLを開くと白画面になることがあるため、同じタブで開く
+          if (isMobileUA) window.location.href = url;
+          else window.open(url, '_blank');
         });
       }
       row.querySelector('.edit').addEventListener('click', (e) => { e.stopPropagation(); startEditScore(s.id); });
