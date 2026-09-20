@@ -397,13 +397,22 @@
       <p id="diagnostics-desc" style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">データの矛盾（存在しない項目への参照など）がないか確認します。通常は問題ありません。</p>
       <button type="button" id="diagnostics-run-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">診断を実行</button>
       <div id="diagnostics-result"></div>
+
+      <p id="error-log-heading" style="font-family:var(--font-serif); font-size:16px; margin:20px 0 8px; border-top:1px solid var(--border); padding-top:16px;">エラーログ</p>
+      <button type="button" id="error-log-clear-btn" style="width:100%; margin-bottom:12px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">ログを消去</button>
+      <div id="error-log-list"></div>
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.012</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.015</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
+
+<div id="fatal-error-overlay" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:100; padding:24px; text-align:center;">
+  <p id="fatal-error-message" style="font-family:var(--font-serif); font-size:15px; margin-top:80px; white-space:pre-line;"></p>
+  <button type="button" onclick="location.reload()" style="margin-top:16px; padding:10px 24px; border:none; border-radius:var(--radius); background:var(--accent); color:var(--surface); font-size:14px; cursor:pointer;">再読み込み</button>
+</div>
 
 <div class="modal-overlay" id="skew-modal">
   <div style="background:var(--surface); border-radius:12px; padding:16px; max-width:480px; width:100%; max-height:90vh; display:flex; flex-direction:column;">
@@ -491,7 +500,7 @@ const I18N = {
     alert_import_invalid_format: 'このファイルの形式が正しくありません。インポートを中止しました（現在のデータは変更されていません）：',
     diagnostics_no_issues: '問題は見つかりませんでした',
     diagnostics_desc: 'データの矛盾（存在しない項目への参照など）がないか確認します。通常は問題ありません。',
-    btn_run_diagnostics: '診断を実行',
+    btn_run_diagnostics: '診断を実行', error_log_heading: 'エラーログ', btn_clear_log: 'ログを消去', log_empty: 'ログはありません',
     diagnostics_issues_found: '{count}件の問題が見つかりました',
     btn_fix: '修復する',
     diagnostics_orphan_composer: '存在しない作曲家を参照している楽曲が{count}件あります（作曲家未設定に修復されます）',
@@ -508,7 +517,7 @@ const I18N = {
     alert_select_photo_first: '写真またはPDFを選択してから読み取ってください（複数枚選んでいる場合は1枚目のみ読み取ります）',
     alert_need_sync_target: '先に「設定」画面で同期先を設定してください',
     alert_setup_failed: '設定に失敗しました：',
-    alert_sync_failed: '同期に失敗しました：',
+    alert_sync_failed: '同期に失敗しました：', fatal_init_error: 'アプリの起動に失敗しました。保存されているデータは失われていません。再読み込みしてもう一度お試しください。エラー内容：',
     alert_feature_not_ready: 'この機能は現在準備中です',
     alert_google_auth_load_failed: 'Googleの認証ライブラリの読み込みに失敗しました。少し待ってからお試しください。',
     confirm_delete_unused_file: 'このファイルを削除しますか？ 設定済みの保存先（フォルダ・Google Drive）からも削除されます。この操作は取り消せません。',
@@ -524,7 +533,7 @@ const I18N = {
     ai_reading_status: '読み取り中…',
     ai_read_filled: '読み取りました（{fields}）。内容を確認・修正してください。',
     ai_read_no_new_fields: '読み取れましたが、既に入力済みの項目は上書きしていません。',
-    ai_read_failed: '読み取りに失敗しました：',
+    ai_read_failed: '読み取りに失敗しました：', ai_read_parse_failed: '読み取り結果を解析できませんでした（現在の入力内容は変わっていません）', ai_read_invalid_format: 'AIの応答形式が正しくありませんでした（現在の入力内容は変わっていません）',
     drive_connect_failed: '接続に失敗しました：',
     drive_no_response: '応答がありませんでした（ポップアップがブロックされていないか確認してください）',
     drive_connecting: '接続中の処理をしています…',
@@ -605,7 +614,7 @@ const I18N = {
     alert_import_invalid_format: 'This file\'s format is invalid. Import cancelled (your current data was not changed): ',
     diagnostics_no_issues: 'No issues found',
     diagnostics_desc: 'Checks for data inconsistencies (such as references to missing items). Usually there\'s nothing to worry about.',
-    btn_run_diagnostics: 'Run Diagnostics',
+    btn_run_diagnostics: 'Run Diagnostics', error_log_heading: 'Error Log', btn_clear_log: 'Clear Log', log_empty: 'No log entries',
     diagnostics_issues_found: '{count} issue(s) found',
     btn_fix: 'Fix',
     diagnostics_orphan_composer: '{count} work(s) reference a composer that no longer exists (will be reset to unset)',
@@ -622,7 +631,7 @@ const I18N = {
     alert_select_photo_first: 'Please select a photo or PDF before reading (if multiple are selected, only the first will be read)',
     alert_need_sync_target: 'Please set up a sync destination in Settings first',
     alert_setup_failed: 'Setup failed: ',
-    alert_sync_failed: 'Sync failed: ',
+    alert_sync_failed: 'Sync failed: ', fatal_init_error: 'The app failed to start. Your saved data has not been lost. Please reload and try again. Error details: ',
     alert_feature_not_ready: 'This feature is not yet available',
     alert_google_auth_load_failed: 'Failed to load Google\'s authentication library. Please wait a moment and try again.',
     confirm_delete_unused_file: 'Delete this file? It will also be removed from your configured destination (folder / Google Drive). This cannot be undone.',
@@ -638,7 +647,7 @@ const I18N = {
     ai_reading_status: 'Reading…',
     ai_read_filled: 'Read successfully ({fields}). Please review and correct as needed.',
     ai_read_no_new_fields: 'Read successfully, but fields you already filled in were not overwritten.',
-    ai_read_failed: 'Reading failed: ',
+    ai_read_failed: 'Reading failed: ', ai_read_parse_failed: 'Could not parse the reading result (your current input was not changed)', ai_read_invalid_format: 'The AI response format was invalid (your current input was not changed)',
     drive_connect_failed: 'Connection failed: ',
     drive_no_response: 'No response received (check whether a pop-up was blocked)',
     drive_connecting: 'Connecting…',
@@ -949,6 +958,15 @@ function isPdfType(type) { return (type || '').includes('pdf'); }
 
 // ================== 画像URLキャッシュ ==================
 const fileUrlCache = new Map();
+function clearFileUrlCache() {
+  for (const url of fileUrlCache.values()) URL.revokeObjectURL(url);
+  fileUrlCache.clear();
+}
+function deleteFileUrlCacheEntry(id) {
+  const url = fileUrlCache.get(id);
+  if (url) URL.revokeObjectURL(url);
+  fileUrlCache.delete(id);
+}
 async function getFileUrl(fileId) {
   if (!fileId) return null;
   if (fileUrlCache.has(fileId)) return fileUrlCache.get(fileId);
@@ -989,6 +1007,7 @@ function showView(name) {
   if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); loadFontSettingsIntoForm(); loadLanguageIntoForm(); }
   if (name === 'unused-files') renderUnusedFilesList();
   if (name === 'sync-history') renderSyncHistoryList();
+  if (name === 'diagnostics') renderErrorLog();
 }
 menuBtn.addEventListener('click', (e) => { e.stopPropagation(); menuDropdown.classList.toggle('open'); });
 document.addEventListener('click', () => menuDropdown.classList.remove('open'));
@@ -1384,6 +1403,7 @@ function startEditScore(scoreId) {
   existingImageFileName = score.image_file_name || null;
   if (score.image_file_id) {
     getFileUrl(score.image_file_id).then(url => {
+      if (currentPreviewLocalUrl) { URL.revokeObjectURL(currentPreviewLocalUrl); currentPreviewLocalUrl = null; }
       if (isPdfType(score.image_type)) {
         photoPreview.style.display = 'none';
         photoPlaceholder.style.display = 'block';
@@ -1426,6 +1446,12 @@ const photoFile = document.getElementById('photo-file');
 const photoPreview = document.getElementById('photo-preview');
 const photoPlaceholder = document.getElementById('photo-placeholder');
 let selectedFiles = [];
+let currentPreviewLocalUrl = null; // 一時プレビュー用のObject URL（自分で作った分だけ解放する）
+function setPhotoPreviewLocalUrl(file) {
+  if (currentPreviewLocalUrl) URL.revokeObjectURL(currentPreviewLocalUrl);
+  currentPreviewLocalUrl = URL.createObjectURL(file);
+  photoPreview.src = currentPreviewLocalUrl;
+}
 let existingImageFileId = null;
 let existingImageType = null;
 let existingImageFileName = null;
@@ -1446,7 +1472,7 @@ photoFile.addEventListener('change', () => {
     photoPlaceholder.style.display = 'block';
     photoPlaceholder.textContent = t('pdf_selected_status') + files[0].name;
   } else {
-    photoPreview.src = URL.createObjectURL(files[0]);
+    setPhotoPreviewLocalUrl(files[0]);
     photoPreview.style.display = 'block';
     photoPlaceholder.style.display = 'none';
   }
@@ -1742,7 +1768,7 @@ document.getElementById('skew-apply-btn').addEventListener('click', async () => 
   canvas.toBlob((blob) => {
     const correctedFile = new File([blob], 'corrected.jpg', { type: 'image/jpeg' });
     selectedFiles = [correctedFile];
-    photoPreview.src = URL.createObjectURL(correctedFile);
+    setPhotoPreviewLocalUrl(correctedFile);
     photoPreview.style.display = 'block';
     photoPlaceholder.style.display = 'none';
     skewModal.classList.remove('open');
@@ -1751,6 +1777,7 @@ document.getElementById('skew-apply-btn').addEventListener('click', async () => 
 
 // ---- 設定・保存 ----
 function resetForm() {
+  if (currentPreviewLocalUrl) { URL.revokeObjectURL(currentPreviewLocalUrl); currentPreviewLocalUrl = null; }
   fTitle.value = '';
   fComposer.value = '';
   fPart.value = '';
@@ -2102,8 +2129,13 @@ aiReadBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error(data.error?.message || 'APIエラー');
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('読み取り結果を解析できませんでした');
+    if (!jsonMatch) throw new Error(t('ai_read_parse_failed'));
     const result = JSON.parse(jsonMatch[0]);
+    for (const key of ['title', 'composer', 'part']) {
+      if (result[key] !== undefined && result[key] !== '' && typeof result[key] !== 'string') {
+        throw new Error(t('ai_read_invalid_format'));
+      }
+    }
     let filled = [];
     if (result.title && !fTitle.value.trim()) { fTitle.value = result.title; fTitle.dispatchEvent(new Event('input', { bubbles: true })); filled.push(t('filter_title')); }
     if (result.composer && !fComposer.value.trim()) { fComposer.value = result.composer; filled.push(t('label_composer')); }
@@ -2255,7 +2287,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   for (const table of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances']) {
     for (const item of (data[table] || [])) await idbPut(table, item);
   }
-  fileUrlCache.clear();
+  clearFileUrlCache();
   await loadData();
   renderResults();
   alert(t('alert_import_done'));
@@ -2446,7 +2478,7 @@ async function applyRemoteWithLocalOverlay(remoteData) {
     for (const item of existing) await idbDelete(table, item.id);
     for (const item of merged) await idbPut(table, item);
   }
-  fileUrlCache.clear();
+  clearFileUrlCache();
   await loadData();
   renderResults();
 }
@@ -2457,7 +2489,7 @@ async function cleanupOrphanLocalBlobs() {
   for (const rec of allFiles) {
     if (!referencedIds.has(rec.id)) {
       await idbDelete('files', rec.id);
-      fileUrlCache.delete(rec.id);
+      deleteFileUrlCacheEntry(rec.id);
     }
   }
 }
@@ -2587,7 +2619,7 @@ async function importMissingLocalFiles(data) {
       await idbPut('files', { id: score.image_file_id, blob: file, type: score.image_type, created_at: nowIso() });
     } catch (err) { console.error('missing local file', fname, err); }
   }
-  fileUrlCache.clear();
+  clearFileUrlCache();
 }
 
 function localLockIO() {
@@ -2660,7 +2692,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
     clearPendingChanges();
     setSyncStatus(t('sync_done') + new Date().toLocaleTimeString());
   } catch (err) {
-    console.error('sync failed', err);
+    logError('sync failed: ' + err.message);
     setSyncStatus(t('alert_sync_failed') + err.message);
     if (manual) alert(t('alert_sync_failed') + err.message);
   } finally {
@@ -2966,7 +2998,7 @@ async function importMissingDriveFiles(data) {
       await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
     } catch (err) { console.error('missing drive file', fname, err); }
   }
-  fileUrlCache.clear();
+  clearFileUrlCache();
 }
 
 document.getElementById('drive-connect-btn').addEventListener('click', async () => {
@@ -3082,7 +3114,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
     clearPendingChanges();
     setDriveStatus(t('sync_done') + new Date().toLocaleTimeString());
   } catch (err) {
-    console.error('drive sync failed', err);
+    logError('drive sync failed: ' + err.message);
     setDriveStatus(t('alert_sync_failed') + err.message);
     if (manual) alert(t('alert_sync_failed') + err.message);
   } finally {
@@ -3101,7 +3133,7 @@ async function getUnusedFileRecords() {
 
 async function deleteFileEverywhere(rec) {
   await idbDelete('files', rec.id);
-  fileUrlCache.delete(rec.id);
+  deleteFileUrlCacheEntry(rec.id);
   const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
   if (syncFilesDirHandle) {
     await syncFilesDirHandle.removeEntry(fname).catch(() => {});
@@ -3223,7 +3255,7 @@ async function restoreImportedDataFull(data) {
     for (const item of (data[table] || [])) await idbPut(table, item);
   }
   clearPendingChanges();
-  fileUrlCache.clear();
+  clearFileUrlCache();
   await loadData();
   // 復元した内容に必要なファイルを取得しておく（files/unusedどちらにあっても探す）
   if (syncFilesDirHandle) await importMissingLocalFiles(data);
@@ -3378,6 +3410,8 @@ function applyTranslations() {
   document.getElementById('sync-history-refresh-btn').textContent = t('btn_load_history');
   document.getElementById('diagnostics-desc').textContent = t('diagnostics_desc');
   document.getElementById('diagnostics-run-btn').textContent = t('btn_run_diagnostics');
+  document.getElementById('error-log-heading').textContent = t('error_log_heading');
+  document.getElementById('error-log-clear-btn').textContent = t('btn_clear_log');
   syncCenterBanner.textContent = t('sync_center_syncing');
 
   // 接続状態などの現在値は、翻訳の巻き込みで消えないよう改めて反映する
@@ -3475,24 +3509,62 @@ async function renderDiagnostics() {
 }
 document.getElementById('diagnostics-run-btn').addEventListener('click', renderDiagnostics);
 
+function renderErrorLog() {
+  const container = document.getElementById('error-log-list');
+  const log = getAppLog();
+  if (log.length === 0) { container.innerHTML = `<div class="empty">${t('log_empty')}</div>`; return; }
+  container.innerHTML = log.map(entry =>
+    `<div class="concert-row"><span style="font-size:12px;">${escapeHtml(entry.time)}<br>${escapeHtml(entry.message)}</span></div>`
+  ).join('');
+}
+document.getElementById('error-log-clear-btn').addEventListener('click', () => {
+  clearAppLog();
+  renderErrorLog();
+});
+
 // ================== 初期化 ==================
+const APP_LOG_KEY = 'scoremate_error_log';
+const APP_LOG_MAX = 50;
+function logError(message) {
+  console.error(message);
+  try {
+    const log = JSON.parse(localStorage.getItem(APP_LOG_KEY) || '[]');
+    log.unshift({ time: new Date().toLocaleString(), message: String(message) });
+    localStorage.setItem(APP_LOG_KEY, JSON.stringify(log.slice(0, APP_LOG_MAX)));
+  } catch (e) { /* ログ保存自体の失敗は無視する */ }
+}
+function getAppLog() {
+  try { return JSON.parse(localStorage.getItem(APP_LOG_KEY) || '[]'); } catch (e) { return []; }
+}
+function clearAppLog() { localStorage.removeItem(APP_LOG_KEY); }
+
+function showFatalError(message) {
+  document.getElementById('fatal-error-message').textContent = message;
+  document.getElementById('fatal-error-overlay').style.display = 'block';
+}
+
 (async () => {
-  applyFontSettings();
-  applyTranslations();
-  await openIdb();
-  await loadData();
-  await loadSyncMeta();
-  await loadDriveMeta();
-  refreshSyncUI();
-  refreshDriveUI();
-  renderResults();
-  if (syncHandle) {
-    await performSync();
-    setupSyncIntervalTimer();
-  }
-  if (driveFileId) {
-    await performDriveSync();
-    setupSyncIntervalTimer();
+  try {
+    applyFontSettings();
+    applyTranslations();
+    await openIdb();
+    await loadData();
+    await loadSyncMeta();
+    await loadDriveMeta();
+    refreshSyncUI();
+    refreshDriveUI();
+    renderResults();
+    if (syncHandle) {
+      await performSync();
+      setupSyncIntervalTimer();
+    }
+    if (driveFileId) {
+      await performDriveSync();
+      setupSyncIntervalTimer();
+    }
+  } catch (err) {
+    logError('fatal init error: ' + err.message);
+    showFatalError(t('fatal_init_error') + '\n' + err.message);
   }
 })();
 
