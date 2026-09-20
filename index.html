@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.028</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.029</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -3939,6 +3939,11 @@ async function restoreImportedDataFull(data) {
   if (syncFilesDirHandle) await importMissingLocalFiles(data);
   if (driveFilesFolderId) await importMissingDriveFiles(data);
   if (dropboxConnected) await importMissingDropboxFiles(data);
+  // クラウド側で「未使用」に移動されてしまっていたファイルを、再び参照されたので戻す
+  // （裏で自動同期が走っていると通常の同期処理がスキップされることがあるため、ここで確実に行う）
+  if (syncFilesDirHandle) await reconcileLocalFileLocations().catch(err => console.error('reconcile local after restore failed', err));
+  if (driveFilesFolderId) await reconcileDriveFileLocations().catch(err => console.error('reconcile drive after restore failed', err));
+  if (dropboxConnected) await reconcileDropboxFileLocations().catch(err => console.error('reconcile dropbox after restore failed', err));
   renderResults();
   // 復元は「これが正しい状態」として、強制的に同期先へ上書きする
   if (syncHandle) await performSync({ forceWrite: true });
