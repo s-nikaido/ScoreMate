@@ -202,6 +202,7 @@
           <button type="button" data-view="unused-files">未使用ファイル</button>
           <button type="button" data-view="sync-history">同期履歴</button>
           <button type="button" data-view="diagnostics" id="menu-diagnostics">データ診断</button>
+          <button type="button" data-view="help" id="menu-help">ヘルプ</button>
           <button type="button" id="export-btn">エクスポート（バックアップ）</button>
           <button type="button" id="import-btn">インポート（復元）</button>
           <input type="file" id="import-file-input" accept="application/json" style="display:none;">
@@ -404,9 +405,80 @@
       <button type="button" id="error-log-clear-btn" style="width:100%; margin-bottom:12px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">ログを消去</button>
       <div id="error-log-list"></div>
     </section>
+
+    <section id="view-help" class="view">
+      <div id="help-content-ja">
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">基本的な使い方</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          「登録」から写真を撮影・選択して楽譜を登録します。曲名は必須、作曲家・パートは空欄でも登録できます。複数枚の写真を選ぶと自動的に1つのPDFにまとめられます。「検索」画面では曲名・演奏会・作曲家・パートで絞り込めます（曲名・演奏会・作曲家タブは頭文字や年でグループ表示され、「全て表示」に切り替えも可能です）。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">データの保存場所について</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          登録したデータはこの端末（ブラウザ）の中に保存されます。他の端末と共有したい場合は、「設定」画面から「フォルダに保存」（PCのみ）または「クラウドに保存」（Google Drive・実験的機能）を設定してください。スマートフォンでは「フォルダに保存」は使えません。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">同期の仕組み（重要）</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          複数端末で同期する場合、それぞれの端末で「変更した内容」だけをクラウド側の最新内容に重ねる方式です。通常の利用（別々の端末で別々の楽譜を登録するなど）では問題なく両方の変更が反映されます。ただし、<b>ごく短い時間内に複数端末でまったく同時に同期処理が走った場合や、同じデータを両端末でほぼ同時に編集した場合</b>は、片方の変更が失われる可能性があります。これは完全な排他制御を行っていないためで、確率的にはまれですが、ゼロではありません。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">万が一データが消えてしまったら</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          メニューの「同期履歴」から、同期のたびに自動保存された過去の状態（最新20件）を確認し、復元できます。復元は「その時点の内容に戻す」動作で、現在のデータは置き換わります。同期を設定していない場合は、この履歴も作成されませんので、メニューの「エクスポート（バックアップ）」を使って定期的に手動バックアップを取ることをおすすめします。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">未使用ファイルについて</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          楽譜を削除しても、添付されていた画像・PDF本体はすぐには削除されません（誤削除からの復旧のため）。メニューの「未使用ファイル」から、使われなくなったファイルを確認し、必要に応じて削除できます。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">マスタの統合</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          「演奏会」「作曲家」「パート」の画面で、同じものを違う表記で登録してしまった場合、各項目の「統合」ボタンからまとめることができます。統合すると、その表記を使っていた楽譜・楽曲は自動的に統合先に付け替えられます。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">AI読み取りについて（任意機能）</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          「設定」画面でGemini APIキーを登録すると、登録画面で写真から曲名・作曲家・パートを自動読み取りできます。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる場合は使わないか、有料キーをご利用ください。すでに入力済みの項目は上書きされません。
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">データ診断</p>
+        <p style="font-size:13px; line-height:1.7; margin:0;">
+          メニューの「データ診断」から、存在しない項目への参照など、データの矛盾がないか確認・修復できます。通常は問題ありません。
+        </p>
+      </div>
+      <div id="help-content-en" style="display:none;">
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Basic Usage</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          Use "Add" to photograph or select a score. A title is required; composer and part can be left blank. Multiple photos are automatically combined into one PDF. In "Search", you can filter by title, concert, composer, or part (title/concert/composer tabs are grouped by initial letter or year, and you can switch to "Show All").
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Where Your Data Is Stored</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          Your data is stored on this device (in your browser). To share it with another device, set up "Save to Folder" (PC only) or "Save to Cloud" (Google Drive, experimental) in Settings. "Save to Folder" is not available on smartphones.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">How Sync Works (Important)</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          When syncing across devices, each device overlays only what it changed onto the latest cloud content. This works fine for normal use (e.g. adding different scores on different devices). However, if two devices sync at the exact same moment, or edit the same data at nearly the same time, one change could be lost. This is because sync is not fully exclusive by design. It's rare, but not impossible.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">If Data Ever Goes Missing</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          Check "Sync History" in the menu — a snapshot is saved automatically before every sync (latest 20 kept), and you can restore from there. Restoring replaces your current data with that snapshot. If sync isn't set up, no history is created, so we recommend using "Export (Backup)" periodically for manual backups.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">About Unused Files</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          When you delete a score, the attached image/PDF isn't deleted right away (to allow recovery from accidental deletion). Check "Unused Files" in the menu to review and delete files that are no longer used.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Merging Master Records</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          If you registered the same concert, composer, or part under different spellings, use the "Merge" button on each item to combine them. Any scores or works using that entry are automatically re-linked to the merged entry.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">AI Reading (Optional)</p>
+        <p style="font-size:13px; line-height:1.7; margin:0 0 16px;">
+          Register a Gemini API key in Settings to automatically read the title, composer, and part from a photo on the Add screen. If you use a free-tier key, images you send may be used by Google to improve its products. If this concerns you, don't use this feature, or use a paid key. Fields you've already filled in won't be overwritten.
+        </p>
+        <p style="font-family:var(--font-serif); font-size:16px; margin:0 0 8px;">Data Diagnostics</p>
+        <p style="font-size:13px; line-height:1.7; margin:0;">
+          Use "Data Diagnostics" in the menu to check for and fix data inconsistencies, such as references to missing items. Usually there's nothing to worry about.
+        </p>
+      </div>
+    </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.016</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.017</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -443,7 +515,7 @@
 const I18N = {
   ja: {
     menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
-    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断',
+    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断', menu_help: 'ヘルプ',
     menu_export: 'エクスポート（バックアップ）', menu_import: 'インポート（復元）',
     search_placeholder: '検索',
     filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
@@ -557,7 +629,7 @@ const I18N = {
   },
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
-    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics',
+    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics', menu_help: 'Help',
     menu_export: 'Export (Backup)', menu_import: 'Import (Restore)',
     search_placeholder: 'Search',
     filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
@@ -989,6 +1061,7 @@ const viewSettings = document.getElementById('view-settings');
 const viewUnusedFiles = document.getElementById('view-unused-files');
 const viewSyncHistory = document.getElementById('view-sync-history');
 const viewDiagnostics = document.getElementById('view-diagnostics');
+const viewHelp = document.getElementById('view-help');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 
@@ -1002,6 +1075,7 @@ function showView(name) {
   viewUnusedFiles.classList.toggle('active', name === 'unused-files');
   viewSyncHistory.classList.toggle('active', name === 'sync-history');
   viewDiagnostics.classList.toggle('active', name === 'diagnostics');
+  viewHelp.classList.toggle('active', name === 'help');
   if (name === 'search') renderResults();
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
@@ -3332,7 +3406,7 @@ document.getElementById('font-custom-input').addEventListener('input', (e) => {
 // ================== 表示設定（言語） ==================
 function applyTranslations() {
   document.querySelectorAll('.menu-dropdown button[data-view]').forEach(btn => {
-    const map = { search: 'menu_search', register: 'menu_register', concerts: 'menu_concerts', composers: 'menu_composers', parts: 'menu_parts', settings: 'menu_settings', 'unused-files': 'menu_unused_files', 'sync-history': 'menu_sync_history', diagnostics: 'menu_diagnostics' };
+    const map = { search: 'menu_search', register: 'menu_register', concerts: 'menu_concerts', composers: 'menu_composers', parts: 'menu_parts', settings: 'menu_settings', 'unused-files': 'menu_unused_files', 'sync-history': 'menu_sync_history', diagnostics: 'menu_diagnostics', help: 'menu_help' };
     const key = map[btn.dataset.view];
     if (key) btn.textContent = t(key);
   });
@@ -3414,6 +3488,8 @@ function applyTranslations() {
   document.getElementById('diagnostics-run-btn').textContent = t('btn_run_diagnostics');
   document.getElementById('error-log-heading').textContent = t('error_log_heading');
   document.getElementById('error-log-clear-btn').textContent = t('btn_clear_log');
+  document.getElementById('help-content-ja').style.display = getLanguage() === 'ja' ? 'block' : 'none';
+  document.getElementById('help-content-en').style.display = getLanguage() === 'en' ? 'block' : 'none';
   syncCenterBanner.textContent = t('sync_center_syncing');
 
   // 接続状態などの現在値は、翻訳の巻き込みで消えないよう改めて反映する
