@@ -215,6 +215,7 @@
           <input type="text" id="search-input" placeholder="検索">
         </div>
         <div class="chip-row" id="filter-chips"></div>
+        <button type="button" id="grouping-toggle-btn" style="display:none; margin:0 0 10px; padding:5px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text-secondary); font-size:12px; cursor:pointer;"></button>
       </div>
       <div id="results"></div>
     </section>
@@ -446,7 +447,7 @@ const I18N = {
     font_custom_placeholder: '例：Noto Sans JP', font_custom_hint: '端末にこのフォントが無い場合は、自動的に標準フォントで表示されます。',
     settings_gemini_key: 'Gemini APIキー', settings_ai_model: 'AIモデル',
     empty_no_scores: '登録された楽譜がありません', empty_no_matches: '該当する楽譜がありません', empty_no_data: '該当するデータがありません',
-    unset_composer: '作曲家未設定', unset_part: 'パート未設定', unset_year: '開催日未設定', group_domestic: '邦人',
+    unset_composer: '作曲家未設定', unset_part: 'パート未設定', unset_year: '開催日未設定', group_domestic: '邦人', btn_show_all: '全て表示', btn_show_grouped: 'グループ化',
     aria_menu: 'メニュー', aria_sync_now: '今すぐ同期',
     photo_placeholder: '写真を撮影 / アップロード',
     error_title_required: '曲名を入力してください', error_part_required: 'パート名を入力してください',
@@ -560,7 +561,7 @@ const I18N = {
     font_custom_placeholder: 'e.g. Noto Sans JP', font_custom_hint: 'If this font isn\'t available on your device, the standard font will be used automatically.',
     settings_gemini_key: 'Gemini API Key', settings_ai_model: 'AI Model',
     empty_no_scores: 'No scores registered', empty_no_matches: 'No matching scores', empty_no_data: 'No matching data',
-    unset_composer: 'Composer not set', unset_part: 'Part not set', unset_year: 'Date not set', group_domestic: 'Japanese',
+    unset_composer: 'Composer not set', unset_part: 'Part not set', unset_year: 'Date not set', group_domestic: 'Japanese', btn_show_all: 'Show All', btn_show_grouped: 'Group',
     aria_menu: 'Menu', aria_sync_now: 'Sync now',
     photo_placeholder: 'Take a photo / Upload',
     error_title_required: 'Please enter a title', error_part_required: 'Please enter a part name',
@@ -1014,6 +1015,19 @@ const filterChipsEl = document.getElementById('filter-chips');
 const FILTERS = ['title', 'concert', 'part', 'composer'];
 let activeFilter = 'title';
 let drillDown = null;
+const GROUPABLE_FILTERS = ['title', 'concert', 'composer'];
+function isGroupingEnabled() { return localStorage.getItem('grouping_enabled') !== 'off'; }
+function refreshGroupingToggle() {
+  const btn = document.getElementById('grouping-toggle-btn');
+  if (!GROUPABLE_FILTERS.includes(activeFilter)) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-block';
+  btn.textContent = isGroupingEnabled() ? t('btn_show_all') : t('btn_show_grouped');
+}
+document.getElementById('grouping-toggle-btn').addEventListener('click', () => {
+  localStorage.setItem('grouping_enabled', isGroupingEnabled() ? 'off' : 'on');
+  refreshGroupingToggle();
+  renderResults();
+});
 
 function renderFilterChips() {
   filterChipsEl.innerHTML = '';
@@ -1160,6 +1174,7 @@ function renderGroupedConcerts() {
   if (query) items = items.filter(item => item.name.toLowerCase().includes(query));
   if (items.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_data')}</div>`; return; }
   const sorted = [...items].sort((a, b) => (b.concert_date || '').localeCompare(a.concert_date || ''));
+  if (!isGroupingEnabled()) { sorted.forEach(c => appendMasterCard(c, performanceCountForConcert, c.concert_date)); return; }
   const groups = new Map();
   for (const c of sorted) {
     const key = c.concert_date ? c.concert_date.slice(0, 4) + '年' : t('unset_year');
@@ -1179,6 +1194,7 @@ function renderGroupedComposers() {
   if (items.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_data')}</div>`; return; }
   const countFn = id => db.works.filter(w => w.composer_id === id).length;
   const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  if (!isGroupingEnabled()) { sorted.forEach(c => appendMasterCard(c, countFn, null)); return; }
   const domesticKey = t('group_domestic');
   const groups = new Map();
   for (const c of sorted) {
@@ -1220,6 +1236,7 @@ async function renderDrillDownList() {
 async function renderResults() {
   const query = searchInput.value.trim();
   resultsEl.innerHTML = '';
+  refreshGroupingToggle();
   if (activeFilter === 'concert' || activeFilter === 'composer' || activeFilter === 'part') {
     if (drillDown && drillDown.type === activeFilter) await renderDrillDownList();
     else renderMasterCardList();
@@ -1228,6 +1245,7 @@ async function renderResults() {
   const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => matches(work, scores, query));
   if (filtered.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_scores')}</div>`; return; }
   filtered.sort((a, b) => a.work.title.localeCompare(b.work.title, 'ja'));
+  if (!isGroupingEnabled()) { await appendWorkCards(filtered); return; }
   const groups = new Map();
   for (const item of filtered) {
     const key = (item.work.title.trim()[0] || '').toUpperCase();
@@ -3473,8 +3491,7 @@ document.getElementById('diagnostics-run-btn').addEventListener('click', renderD
     setupSyncIntervalTimer();
   }
   if (driveFileId) {
-    // 起動時は自動同期しない（毎回Googleの再認証ポップアップが出るのを避けるため）。
-    // 変更時（scheduleSync）と定期同期のタイミングでのみ同期する。
+    await performDriveSync();
     setupSyncIntervalTimer();
   }
 })();
