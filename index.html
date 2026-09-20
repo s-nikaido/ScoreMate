@@ -539,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.036</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.037</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -1260,6 +1260,7 @@ function renderFilterChips() {
     chip.addEventListener('click', () => {
       activeFilter = f;
       drillDown = null;
+      searchInput.value = '';
       [...filterChipsEl.children].forEach(c => c.classList.toggle('active', c.dataset.filterKey === f));
       renderResults();
     });
@@ -1371,7 +1372,7 @@ function appendMasterCard(item, countFn, subText, container = resultsEl) {
     <div><p class="title">${escapeHtml(item.name)}</p>${subText ? `<p class="sub">${escapeHtml(subText)}</p>` : ''}</div>
     <span class="count">${countFn(item.id)}件</span>
   `;
-  header.addEventListener('click', () => { drillDown = { type: activeFilter, id: item.id, name: item.name }; renderResults(); });
+  header.addEventListener('click', () => { drillDown = { type: activeFilter, id: item.id, name: item.name }; searchInput.value = ''; renderResults(); });
   card.appendChild(header);
   container.appendChild(card);
 }
@@ -1451,7 +1452,7 @@ function renderGroupedComposers() {
 }
 
 async function renderDrillDownList(query = '') {
-  renderBackButton(() => { drillDown = null; renderResults(); }, drillDown.name);
+  renderBackButton(() => { drillDown = null; searchInput.value = ''; renderResults(); }, drillDown.name);
   if (drillDown.type === 'concert') {
     await renderConcertProgramList(query);
     return;
