@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.024</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.026</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -846,13 +846,37 @@ const PENDING_TABLES = ['works', 'scores', 'composers', 'parts', 'concerts', 'pe
 const pendingChanged = {};
 const pendingDeleted = {};
 for (const t of PENDING_TABLES) { pendingChanged[t] = new Set(); pendingDeleted[t] = new Set(); }
-function markChanged(table, id) { pendingDeleted[table].delete(id); pendingChanged[table].add(id); }
-function markDeleted(table, id) { pendingChanged[table].delete(id); pendingDeleted[table].add(id); }
+// 「この端末で変更した」という印は、同期完了前にタブが閉じられても消えないよう保存しておく
+// （保存し忘れると、次回起動時にクラウドの古い内容で上書きされ、その変更が消えてしまう）
+let savePendingTimer = null;
+function savePendingChangesDebounced() {
+  clearTimeout(savePendingTimer);
+  savePendingTimer = setTimeout(() => {
+    const data = {};
+    for (const t of PENDING_TABLES) data[t] = { changed: [...pendingChanged[t]], deleted: [...pendingDeleted[t]] };
+    idbPut('meta', { id: 'pending', data }).catch(err => console.error('save pending changes failed', err));
+  }, 300);
+}
+async function loadPendingChanges() {
+  try {
+    const rec = await idbGet('meta', 'pending');
+    if (rec && rec.data) {
+      for (const t of PENDING_TABLES) {
+        pendingChanged[t] = new Set((rec.data[t] && rec.data[t].changed) || []);
+        pendingDeleted[t] = new Set((rec.data[t] && rec.data[t].deleted) || []);
+      }
+    }
+  } catch (err) { console.error('load pending changes failed', err); }
+}
+function markChanged(table, id) { pendingDeleted[table].delete(id); pendingChanged[table].add(id); savePendingChangesDebounced(); }
+function markDeleted(table, id) { pendingChanged[table].delete(id); pendingDeleted[table].add(id); savePendingChangesDebounced(); }
 function hasAnyPendingChanges() {
   return PENDING_TABLES.some(t => pendingChanged[t].size > 0 || pendingDeleted[t].size > 0);
 }
 function clearPendingChanges() {
   for (const t of PENDING_TABLES) { pendingChanged[t].clear(); pendingDeleted[t].clear(); }
+  clearTimeout(savePendingTimer);
+  idbPut('meta', { id: 'pending', data: {} }).catch(err => console.error('clear pending changes failed', err));
 }
 
 function makeSimpleMaster(table) {
@@ -3194,12 +3218,12 @@ async function pushDriveFiles() {
   const unusedFolderId = await findOrCreateDriveUnusedFolder();
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
-    const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
-    let exists = !!(await findDriveFileById(driveFilesFolderId, rec.id));
-    if (!exists && unusedFolderId) exists = !!(await findDriveFileById(unusedFolderId, rec.id));
-    if (exists) continue;
-
     try {
+      const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
+      let exists = !!(await findDriveFileById(driveFilesFolderId, rec.id));
+      if (!exists && unusedFolderId) exists = !!(await findDriveFileById(unusedFolderId, rec.id));
+      if (exists) continue;
+
       const boundary = 'scoremate' + Date.now();
       const metadata = { name: fname, parents: [driveFilesFolderId] };
       const base64Data = await blobToBase64(rec.blob);
@@ -3217,7 +3241,7 @@ async function pushDriveFiles() {
         headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
         body,
       });
-    } catch (err) { console.error('drive file upload failed', fname, err); }
+    } catch (err) { console.error('drive file push failed', rec.id, err); }
   }
 }
 
@@ -3594,12 +3618,13 @@ async function dropboxFindById(dirPath, fileRecId) {
 async function pushDropboxFiles() {
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
-    const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
-    const existingInFiles = await dropboxFindById(DROPBOX_FILES_DIR, rec.id);
-    const existingInUnused = existingInFiles ? null : await dropboxFindById(DROPBOX_UNUSED_DIR, rec.id);
-    if (existingInFiles || existingInUnused) continue;
-    try { await dropboxUpload(`${DROPBOX_FILES_DIR}/${fname}`, rec.blob); }
-    catch (err) { console.error('dropbox file upload failed', fname, err); }
+    try {
+      const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
+      const existingInFiles = await dropboxFindById(DROPBOX_FILES_DIR, rec.id);
+      const existingInUnused = existingInFiles ? null : await dropboxFindById(DROPBOX_UNUSED_DIR, rec.id);
+      if (existingInFiles || existingInUnused) continue;
+      await dropboxUpload(`${DROPBOX_FILES_DIR}/${fname}`, rec.blob);
+    } catch (err) { console.error('dropbox file push failed', rec.id, err); }
   }
 }
 
@@ -4195,6 +4220,7 @@ if ('serviceWorker' in navigator) {
     applyTranslations();
     await openIdb();
     await loadData();
+    await loadPendingChanges();
     await loadSyncMeta();
     await loadDriveMeta();
     await loadDropboxMeta();
