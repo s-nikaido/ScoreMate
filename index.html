@@ -195,6 +195,7 @@
           <button type="button" data-view="settings">設定</button>
           <button type="button" data-view="unused-files">未使用ファイル</button>
           <button type="button" data-view="sync-history">同期履歴</button>
+          <button type="button" data-view="diagnostics" id="menu-diagnostics">データ診断</button>
           <button type="button" id="export-btn">エクスポート（バックアップ）</button>
           <button type="button" id="import-btn">インポート（復元）</button>
           <input type="file" id="import-file-input" accept="application/json" style="display:none;">
@@ -386,9 +387,15 @@
       <button type="button" id="sync-history-refresh-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">履歴を読み込む</button>
       <div id="sync-history-list"></div>
     </section>
+
+    <section id="view-diagnostics" class="view">
+      <p id="diagnostics-desc" style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">データの矛盾（存在しない項目への参照など）がないか確認します。通常は問題ありません。</p>
+      <button type="button" id="diagnostics-run-btn" style="width:100%; margin-bottom:16px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">診断を実行</button>
+      <div id="diagnostics-result"></div>
+    </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.005</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.009</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -420,7 +427,7 @@
 const I18N = {
   ja: {
     menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
-    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴',
+    menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断',
     menu_export: 'エクスポート（バックアップ）', menu_import: 'インポート（復元）',
     search_placeholder: '検索',
     filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
@@ -435,7 +442,7 @@ const I18N = {
     font_custom_placeholder: '例：Noto Sans JP', font_custom_hint: '端末にこのフォントが無い場合は、自動的に標準フォントで表示されます。',
     settings_gemini_key: 'Gemini APIキー', settings_ai_model: 'AIモデル',
     empty_no_scores: '登録された楽譜がありません', empty_no_matches: '該当する楽譜がありません', empty_no_data: '該当するデータがありません',
-    unset_composer: '作曲家未設定', unset_part: 'パート未設定',
+    unset_composer: '作曲家未設定', unset_part: 'パート未設定', unset_year: '開催日未設定',
     aria_menu: 'メニュー', aria_sync_now: '今すぐ同期',
     photo_placeholder: '写真を撮影 / アップロード',
     error_title_required: '曲名を入力してください', error_part_required: 'パート名を入力してください',
@@ -475,6 +482,19 @@ const I18N = {
     confirm_delete_concert_simple: 'この演奏会を削除しますか？',
     confirm_delete_score: 'この楽譜を削除しますか？',
     confirm_import: 'インポートすると、現在のデータはすべて削除され、このファイルの内容に置き換わります。この操作は取り消せません。実行しますか？',
+    alert_import_invalid_json: 'このファイルは正しいJSON形式ではありません。インポートを中止しました（現在のデータは変更されていません）。',
+    alert_import_invalid_format: 'このファイルの形式が正しくありません。インポートを中止しました（現在のデータは変更されていません）：',
+    diagnostics_no_issues: '問題は見つかりませんでした',
+    diagnostics_desc: 'データの矛盾（存在しない項目への参照など）がないか確認します。通常は問題ありません。',
+    btn_run_diagnostics: '診断を実行',
+    diagnostics_issues_found: '{count}件の問題が見つかりました',
+    btn_fix: '修復する',
+    diagnostics_orphan_composer: '存在しない作曲家を参照している楽曲が{count}件あります（作曲家未設定に修復されます）',
+    diagnostics_orphan_work: '存在しない楽曲を参照している楽譜が{count}件あります（削除されます）',
+    diagnostics_orphan_part: '存在しないパートを参照している楽譜が{count}件あります（パート未設定に修復されます）',
+    diagnostics_orphan_file: '存在しないファイルを参照している楽譜が{count}件あります（添付なしに修復されます）',
+    diagnostics_orphan_perf_score: '存在しない楽譜を参照している演奏履歴が{count}件あります（削除されます）',
+    diagnostics_orphan_perf_concert: '存在しない演奏会を参照している演奏履歴が{count}件あります（削除されます）',
     alert_import_done: 'インポートが完了しました',
     alert_need_api_key: '先にAPIキーを入力してください',
     alert_fetch_failed: '取得に失敗しました：',
@@ -521,7 +541,7 @@ const I18N = {
   },
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
-    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History',
+    menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics',
     menu_export: 'Export (Backup)', menu_import: 'Import (Restore)',
     search_placeholder: 'Search',
     filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
@@ -536,7 +556,7 @@ const I18N = {
     font_custom_placeholder: 'e.g. Noto Sans JP', font_custom_hint: 'If this font isn\'t available on your device, the standard font will be used automatically.',
     settings_gemini_key: 'Gemini API Key', settings_ai_model: 'AI Model',
     empty_no_scores: 'No scores registered', empty_no_matches: 'No matching scores', empty_no_data: 'No matching data',
-    unset_composer: 'Composer not set', unset_part: 'Part not set',
+    unset_composer: 'Composer not set', unset_part: 'Part not set', unset_year: 'Date not set',
     aria_menu: 'Menu', aria_sync_now: 'Sync now',
     photo_placeholder: 'Take a photo / Upload',
     error_title_required: 'Please enter a title', error_part_required: 'Please enter a part name',
@@ -576,6 +596,19 @@ const I18N = {
     confirm_delete_concert_simple: 'Delete this concert?',
     confirm_delete_score: 'Delete this score?',
     confirm_import: 'Importing will delete all current data and replace it with the contents of this file. This cannot be undone. Continue?',
+    alert_import_invalid_json: 'This file is not valid JSON. Import cancelled (your current data was not changed).',
+    alert_import_invalid_format: 'This file\'s format is invalid. Import cancelled (your current data was not changed): ',
+    diagnostics_no_issues: 'No issues found',
+    diagnostics_desc: 'Checks for data inconsistencies (such as references to missing items). Usually there\'s nothing to worry about.',
+    btn_run_diagnostics: 'Run Diagnostics',
+    diagnostics_issues_found: '{count} issue(s) found',
+    btn_fix: 'Fix',
+    diagnostics_orphan_composer: '{count} work(s) reference a composer that no longer exists (will be reset to unset)',
+    diagnostics_orphan_work: '{count} score(s) reference a work that no longer exists (will be deleted)',
+    diagnostics_orphan_part: '{count} score(s) reference a part that no longer exists (will be reset to unset)',
+    diagnostics_orphan_file: '{count} score(s) reference a file that no longer exists (attachment will be cleared)',
+    diagnostics_orphan_perf_score: '{count} performance record(s) reference a score that no longer exists (will be deleted)',
+    diagnostics_orphan_perf_concert: '{count} performance record(s) reference a concert that no longer exists (will be deleted)',
     alert_import_done: 'Import complete',
     alert_need_api_key: 'Please enter an API key first',
     alert_fetch_failed: 'Fetch failed: ',
@@ -638,14 +671,30 @@ const IDB_VERSION = 3;
 const STORES = ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files', 'meta', 'tombstones'];
 let idb;
 
+// バージョンごとの追加マイグレーション。新しいバージョンを追加する際は、
+// このオブジェクトに { バージョン番号: (db, tx) => {...} } を追記していく。
+// STORESに追記しただけの新規ストアは自動作成されるので、ここに書くのは
+// 「既存レコードの変換」など、追加処理が必要な場合のみでよい。
+const MIGRATIONS = {
+  // 例: 4: (db, tx) => { ... },
+};
+
 function openIdb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, IDB_VERSION);
     req.onupgradeneeded = (e) => {
       const d = e.target.result;
+      const tx = e.target.transaction;
+      const oldVersion = e.oldVersion || 0;
       STORES.forEach(name => {
         if (!d.objectStoreNames.contains(name)) d.createObjectStore(name, { keyPath: 'id' });
       });
+      for (let v = oldVersion + 1; v <= IDB_VERSION; v++) {
+        if (MIGRATIONS[v]) {
+          try { MIGRATIONS[v](d, tx); }
+          catch (err) { console.error('migration to v' + v + ' failed', err); }
+        }
+      }
     };
     req.onsuccess = () => { idb = req.result; resolve(idb); };
     req.onerror = () => reject(req.error);
@@ -914,6 +963,7 @@ const viewParts = document.getElementById('view-parts');
 const viewSettings = document.getElementById('view-settings');
 const viewUnusedFiles = document.getElementById('view-unused-files');
 const viewSyncHistory = document.getElementById('view-sync-history');
+const viewDiagnostics = document.getElementById('view-diagnostics');
 const menuBtn = document.getElementById('menu-btn');
 const menuDropdown = document.getElementById('menu-dropdown');
 
@@ -926,6 +976,7 @@ function showView(name) {
   viewSettings.classList.toggle('active', name === 'settings');
   viewUnusedFiles.classList.toggle('active', name === 'unused-files');
   viewSyncHistory.classList.toggle('active', name === 'sync-history');
+  viewDiagnostics.classList.toggle('active', name === 'diagnostics');
   if (name === 'search') renderResults();
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
@@ -1072,8 +1123,16 @@ function renderMasterCardList() {
   const query = searchInput.value.trim().toLowerCase();
   if (query) items = items.filter(item => item.name.toLowerCase().includes(query));
   if (items.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_data')}</div>`; return; }
-  const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  const isConcert = activeFilter === 'concert';
+  const sorted = isConcert
+    ? [...items].sort((a, b) => (b.concert_date || '').localeCompare(a.concert_date || ''))
+    : [...items].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  let lastGroup = null;
   sorted.forEach(item => {
+    if (isConcert) {
+      const group = item.concert_date ? item.concert_date.slice(0, 4) + '年' : t('unset_year');
+      if (group !== lastGroup) { appendGroupHeading(group); lastGroup = group; }
+    }
     const card = document.createElement('div');
     card.className = 'work-card';
     const header = document.createElement('div');
@@ -1110,6 +1169,13 @@ async function renderDrillDownList() {
   await appendWorkCards(filtered);
 }
 
+function appendGroupHeading(text) {
+  const h = document.createElement('div');
+  h.textContent = text;
+  h.style.cssText = 'font-family:var(--font-serif); font-size:13px; color:var(--text-muted); margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--border);';
+  resultsEl.appendChild(h);
+}
+
 async function renderResults() {
   const query = searchInput.value.trim();
   resultsEl.innerHTML = '';
@@ -1120,7 +1186,13 @@ async function renderResults() {
   }
   const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => matches(work, scores, query));
   if (filtered.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_scores')}</div>`; return; }
-  await appendWorkCards(filtered);
+  filtered.sort((a, b) => a.work.title.localeCompare(b.work.title, 'ja'));
+  let lastGroup = null;
+  for (const item of filtered) {
+    const group = (item.work.title.trim()[0] || '').toUpperCase();
+    if (group !== lastGroup) { appendGroupHeading(group); lastGroup = group; }
+    await appendWorkCards([item]);
+  }
 }
 
 
@@ -2051,7 +2123,7 @@ function base64ToBlob(base64, type) {
 }
 document.getElementById('export-btn').addEventListener('click', async () => {
   const data = {
-    version: 1, exported_at: nowIso(),
+    backup_version: BACKUP_FORMAT_VERSION, exported_at: nowIso(),
     works: db.works, scores: db.scores, composers: db.composers, parts: db.parts,
     concerts: db.concerts, performances: db.performances, files: [],
   };
@@ -2073,11 +2145,41 @@ document.getElementById('import-btn').addEventListener('click', () => {
   document.getElementById('import-file-input').click();
   menuDropdown.classList.remove('open');
 });
+function validateBackupData(data) {
+  if (!data || typeof data !== 'object') return { ok: false, reason: 'not an object' };
+  const tables = ['works', 'scores', 'composers', 'parts', 'concerts', 'performances'];
+  for (const table of tables) {
+    if (data[table] !== undefined && !Array.isArray(data[table])) return { ok: false, reason: table + ' is not an array' };
+  }
+  if (data.files !== undefined) {
+    if (!Array.isArray(data.files)) return { ok: false, reason: 'files is not an array' };
+    for (const f of data.files) {
+      if (!f || typeof f.id !== 'string' || typeof f.type !== 'string' || typeof f.base64 !== 'string') {
+        return { ok: false, reason: 'invalid file entry' };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 document.getElementById('import-file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const text = await file.text();
-  const data = JSON.parse(text);
+  let data;
+  try {
+    const text = await file.text();
+    data = JSON.parse(text);
+  } catch (err) {
+    alert(t('alert_import_invalid_json'));
+    e.target.value = '';
+    return;
+  }
+  const validation = validateBackupData(data);
+  if (!validation.ok) {
+    alert(t('alert_import_invalid_format') + validation.reason);
+    e.target.value = '';
+    return;
+  }
   const proceed = confirm(t('confirm_import'));
   if (!proceed) { e.target.value = ''; return; }
   for (const store of ['works', 'scores', 'composers', 'parts', 'concerts', 'performances', 'files']) {
@@ -2248,8 +2350,10 @@ function scheduleSync() {
   }
 }
 
+const BACKUP_FORMAT_VERSION = 1;
 async function buildExportData() {
   return {
+    backup_version: BACKUP_FORMAT_VERSION,
     meta: { updated_at: nowIso() },
     works: db.works, scores: db.scores, composers: db.composers, parts: db.parts,
     concerts: db.concerts, performances: db.performances,
@@ -2259,6 +2363,10 @@ async function buildExportData() {
 // クラウドの最新データに、この端末で変更した項目「だけ」を重ねて適用する。
 // クラウド側で他端末が加えた変更（この端末が知らないもの）はそのまま残る。
 async function applyRemoteWithLocalOverlay(remoteData) {
+  const validation = validateBackupData(remoteData);
+  if (!validation.ok) {
+    throw new Error(t('alert_import_invalid_format') + validation.reason);
+  }
   for (const table of PENDING_TABLES) {
     const remoteList = remoteData[table] || [];
     const map = new Map();
@@ -3075,6 +3183,8 @@ async function restoreFromHistoryEntry(entry) {
       text = await res.text();
     }
     const data = JSON.parse(text);
+    const validation = validateBackupData(data);
+    if (!validation.ok) { alert(t('alert_import_invalid_format') + validation.reason); return; }
     await restoreImportedDataFull(data);
     alert(t('alert_restore_done'));
     showView('search');
@@ -3125,7 +3235,7 @@ document.getElementById('font-custom-input').addEventListener('input', (e) => {
 // ================== 表示設定（言語） ==================
 function applyTranslations() {
   document.querySelectorAll('.menu-dropdown button[data-view]').forEach(btn => {
-    const map = { search: 'menu_search', register: 'menu_register', concerts: 'menu_concerts', composers: 'menu_composers', parts: 'menu_parts', settings: 'menu_settings', 'unused-files': 'menu_unused_files', 'sync-history': 'menu_sync_history' };
+    const map = { search: 'menu_search', register: 'menu_register', concerts: 'menu_concerts', composers: 'menu_composers', parts: 'menu_parts', settings: 'menu_settings', 'unused-files': 'menu_unused_files', 'sync-history': 'menu_sync_history', diagnostics: 'menu_diagnostics' };
     const key = map[btn.dataset.view];
     if (key) btn.textContent = t(key);
   });
@@ -3203,6 +3313,8 @@ function applyTranslations() {
   document.getElementById('unused-files-delete-all-btn').textContent = t('btn_delete_all');
   document.getElementById('sync-history-desc').textContent = t('sync_history_desc');
   document.getElementById('sync-history-refresh-btn').textContent = t('btn_load_history');
+  document.getElementById('diagnostics-desc').textContent = t('diagnostics_desc');
+  document.getElementById('diagnostics-run-btn').textContent = t('btn_run_diagnostics');
   syncCenterBanner.textContent = t('sync_center_syncing');
 
   // 接続状態などの現在値は、翻訳の巻き込みで消えないよう改めて反映する
@@ -3218,6 +3330,87 @@ document.getElementById('language-select').addEventListener('change', (e) => {
 function loadLanguageIntoForm() {
   document.getElementById('language-select').value = getLanguage();
 }
+
+// ================== データ整合性チェック ==================
+async function runDiagnostics() {
+  const issues = [];
+  const composerIds = new Set(db.composers.map(c => c.id));
+  const partIds = new Set(db.parts.map(p => p.id));
+  const workIds = new Set(db.works.map(w => w.id));
+  const scoreIds = new Set(db.scores.map(s => s.id));
+  const concertIds = new Set(db.concerts.map(c => c.id));
+  const fileRecords = await idbGetAll('files');
+  const fileIds = new Set(fileRecords.map(f => f.id));
+
+  const orphanWorks = db.works.filter(w => w.composer_id && !composerIds.has(w.composer_id));
+  const orphanScoresWork = db.scores.filter(s => !workIds.has(s.work_id));
+  const orphanScoresPart = db.scores.filter(s => s.part_id && !partIds.has(s.part_id));
+  const orphanScoresFile = db.scores.filter(s => s.image_file_id && !fileIds.has(s.image_file_id));
+  const orphanPerfScore = db.performances.filter(p => !scoreIds.has(p.score_id));
+  const orphanPerfConcert = db.performances.filter(p => !concertIds.has(p.concert_id));
+
+  if (orphanWorks.length) issues.push({ key: 'orphan_composer', count: orphanWorks.length, fix: () => fixOrphanComposer(orphanWorks) });
+  if (orphanScoresWork.length) issues.push({ key: 'orphan_work', count: orphanScoresWork.length, fix: () => fixOrphanScoresWork(orphanScoresWork) });
+  if (orphanScoresPart.length) issues.push({ key: 'orphan_part', count: orphanScoresPart.length, fix: () => fixOrphanPart(orphanScoresPart) });
+  if (orphanScoresFile.length) issues.push({ key: 'orphan_file', count: orphanScoresFile.length, fix: () => fixOrphanFile(orphanScoresFile) });
+  if (orphanPerfScore.length) issues.push({ key: 'orphan_perf_score', count: orphanPerfScore.length, fix: () => fixOrphanPerfScore(orphanPerfScore) });
+  if (orphanPerfConcert.length) issues.push({ key: 'orphan_perf_concert', count: orphanPerfConcert.length, fix: () => fixOrphanPerfConcert(orphanPerfConcert) });
+  return issues;
+}
+
+async function fixOrphanComposer(list) {
+  for (const w of list) { w.composer_id = null; await idbPut('works', w); markChanged('works', w.id); }
+}
+async function fixOrphanScoresWork(list) {
+  for (const s of list) { await idbDelete('scores', s.id); markDeleted('scores', s.id); }
+  db.scores = db.scores.filter(s => !list.includes(s));
+}
+async function fixOrphanPart(list) {
+  for (const s of list) { s.part_id = null; await idbPut('scores', s); markChanged('scores', s.id); }
+}
+async function fixOrphanFile(list) {
+  for (const s of list) { s.image_file_id = null; s.image_type = null; s.image_file_name = null; await idbPut('scores', s); markChanged('scores', s.id); }
+}
+async function fixOrphanPerfScore(list) {
+  for (const p of list) { await idbDelete('performances', p.id); markDeleted('performances', p.id); }
+  db.performances = db.performances.filter(p => !list.includes(p));
+}
+async function fixOrphanPerfConcert(list) {
+  for (const p of list) { await idbDelete('performances', p.id); markDeleted('performances', p.id); }
+  db.performances = db.performances.filter(p => !list.includes(p));
+}
+
+async function renderDiagnostics() {
+  const container = document.getElementById('diagnostics-result');
+  container.innerHTML = `<div class="empty">${t('loading_status')}</div>`;
+  const issues = await runDiagnostics();
+  if (issues.length === 0) {
+    container.innerHTML = `<div class="empty">${t('diagnostics_no_issues')}</div>`;
+    return;
+  }
+  container.innerHTML = '';
+  const summary = document.createElement('p');
+  summary.style.cssText = 'font-size:13px; color:var(--danger); margin:0 0 12px;';
+  summary.textContent = tf('diagnostics_issues_found', { count: issues.length });
+  container.appendChild(summary);
+  issues.forEach(issue => {
+    const row = document.createElement('div');
+    row.className = 'concert-row';
+    row.innerHTML = `
+      <span>${tf('diagnostics_' + issue.key, { count: issue.count })}</span>
+      <div class="actions"><button type="button" class="fix">${t('btn_fix')}</button></div>
+    `;
+    row.querySelector('.fix').addEventListener('click', async () => {
+      await issue.fix();
+      await loadData();
+      renderResults();
+      scheduleSync();
+      renderDiagnostics();
+    });
+    container.appendChild(row);
+  });
+}
+document.getElementById('diagnostics-run-btn').addEventListener('click', renderDiagnostics);
 
 // ================== 初期化 ==================
 (async () => {
