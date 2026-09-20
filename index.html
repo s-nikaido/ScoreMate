@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.022</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.024</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -641,7 +641,7 @@ const I18N = {
     export_selected_count: '{count}件選択中',
     exporting_pdf_status: '作成中…',
     export_no_pages: '出力できるファイルがありませんでした',
-    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す', program_reorder_hint: '左のハンドル（⠿）をドラッグすると、この演奏会内での曲順を変更できます。', alert_popup_blocked: 'ポップアップがブロックされました。ブラウザの設定を確認してください。',
+    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す', program_reorder_hint: '左のハンドル（⠿）をドラッグすると、この演奏会内での曲順を変更できます。', alert_popup_blocked: 'ポップアップがブロックされました。ブラウザの設定を確認してください。', confirm_dropbox_disconnect: 'Dropboxとの接続情報を消去します。もう一度「Dropboxにつなぐ」から接続し直してください。よろしいですか？',
     source_folder: 'フォルダ', btn_restore_this: 'この内容に戻す',
     pdf_selected_status: 'PDFを選択しました：',
     skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
@@ -759,7 +759,7 @@ const I18N = {
     export_selected_count: '{count} selected',
     exporting_pdf_status: 'Creating…',
     export_no_pages: 'No files could be exported',
-    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF', program_reorder_hint: 'Drag the handle (⠿) on the left to reorder the pieces in this concert.', alert_popup_blocked: 'Popup was blocked. Please check your browser settings.',
+    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF', program_reorder_hint: 'Drag the handle (⠿) on the left to reorder the pieces in this concert.', alert_popup_blocked: 'Popup was blocked. Please check your browser settings.', confirm_dropbox_disconnect: 'This will clear the saved Dropbox connection. You can reconnect afterward using \'Connect to Dropbox\'. Continue?',
     source_folder: 'Folder', btn_restore_this: 'Restore This',
     pdf_selected_status: 'PDF selected: ',
     skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
@@ -3655,7 +3655,13 @@ async function backupDropboxHistory() {
 }
 
 document.getElementById('dropbox-connect-btn').addEventListener('click', async () => {
-  const ok = await requestDropboxToken({ silent: false });
+  // 古い接続情報が残っていると失敗の原因になるため、つなぎ直す前に必ずクリアする
+  dropboxAccessToken = null;
+  dropboxRefreshToken = null;
+  dropboxTokenExpiresAt = 0;
+  dropboxConnected = false;
+  await saveDropboxMeta();
+  const ok = await dropboxPopupAuth();
   if (!ok) return;
   setDropboxStatus(t('drive_connecting'));
   try {
