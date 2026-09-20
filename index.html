@@ -366,14 +366,25 @@
           <label id="label-cloud-provider">保存先のクラウド</label>
           <select id="cloud-provider-select" style="margin-bottom:4px;">
             <option value="google-drive">Google Drive</option>
+            <option value="dropbox">Dropbox</option>
           </select>
           <p id="drive-experimental-note" style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">PC向けの実験的な機能です。</p>
           <p id="drive-mobile-note" style="font-size:12px; color:var(--text-muted); display:none;">スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。</p>
-          <div id="drive-pc-ui">
-            <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
-            <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveにつなぐ</button>
-            <p id="drive-popup-hint" style="font-size:11px; color:var(--text-muted); margin:0 0 8px; display:none;">つながらない場合は、iPhoneの「設定」→「Safari」→「ポップアップブロック」をオフにしてから、もう一度お試しください。</p>
-            <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐ保存する</button>
+          <div id="cloud-provider-google-drive">
+            <div id="drive-pc-ui">
+              <p id="drive-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
+              <button type="button" id="drive-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Google Driveにつなぐ</button>
+              <p id="drive-popup-hint" style="font-size:11px; color:var(--text-muted); margin:0 0 8px; display:none;">つながらない場合は、iPhoneの「設定」→「Safari」→「ポップアップブロック」をオフにしてから、もう一度お試しください。</p>
+              <button type="button" id="drive-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐ保存する</button>
+            </div>
+          </div>
+          <div id="cloud-provider-dropbox" style="display:none;">
+            <div id="dropbox-pc-ui">
+              <p id="dropbox-status" style="font-size:13px; color:var(--text-secondary); margin:0 0 8px;">未接続</p>
+              <button type="button" id="dropbox-connect-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; cursor:pointer;">Dropboxにつなぐ</button>
+              <p id="dropbox-popup-hint" style="font-size:11px; color:var(--text-muted); margin:0 0 8px; display:none;">つながらない場合は、iPhoneの「設定」→「Safari」→「ポップアップブロック」をオフにしてから、もう一度お試しください。</p>
+              <button type="button" id="dropbox-sync-now-btn" style="width:100%; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer; display:none;">今すぐ保存する</button>
+            </div>
           </div>
         </div>
       </div>
@@ -485,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.020</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.021</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -630,7 +641,7 @@ const I18N = {
     export_selected_count: '{count}件選択中',
     exporting_pdf_status: '作成中…',
     export_no_pages: '出力できるファイルがありませんでした',
-    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す', program_reorder_hint: '左のハンドル（⠿）をドラッグすると、この演奏会内での曲順を変更できます。',
+    export_failed: 'PDFの作成に失敗しました：', btn_clear_selection: '選択解除', btn_export_pdf: 'PDFに書き出す', program_reorder_hint: '左のハンドル（⠿）をドラッグすると、この演奏会内での曲順を変更できます。', alert_popup_blocked: 'ポップアップがブロックされました。ブラウザの設定を確認してください。',
     source_folder: 'フォルダ', btn_restore_this: 'この内容に戻す',
     pdf_selected_status: 'PDFを選択しました：',
     skew_detecting: '自動検出中…', skew_detected: '自動検出しました（ズレていれば指で調整してください）',
@@ -748,7 +759,7 @@ const I18N = {
     export_selected_count: '{count} selected',
     exporting_pdf_status: 'Creating…',
     export_no_pages: 'No files could be exported',
-    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF', program_reorder_hint: 'Drag the handle (⠿) on the left to reorder the pieces in this concert.',
+    export_failed: 'Failed to create PDF: ', btn_clear_selection: 'Clear Selection', btn_export_pdf: 'Export as PDF', program_reorder_hint: 'Drag the handle (⠿) on the left to reorder the pieces in this concert.', alert_popup_blocked: 'Popup was blocked. Please check your browser settings.',
     source_folder: 'Folder', btn_restore_this: 'Restore This',
     pdf_selected_status: 'PDF selected: ',
     skew_detecting: 'Detecting automatically…', skew_detected: 'Detected automatically (drag a point if it\'s off)',
@@ -1098,7 +1109,7 @@ function showView(name) {
   if (name === 'concerts') renderConcertMasterList();
   if (name === 'composers') renderComposerMasterList();
   if (name === 'parts') renderPartMasterList();
-  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); applySyncCategory(getSyncCategory()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); loadFontSettingsIntoForm(); loadLanguageIntoForm(); }
+  if (name === 'settings') { loadGeminiSettingsIntoForm(); refreshSyncUI(); refreshDriveUI(); refreshDropboxUI(); applySyncCategory(getSyncCategory()); applyCloudProvider(getCloudProvider()); syncIntervalSelect.value = String(getSyncIntervalMinutes()); loadFontSettingsIntoForm(); loadLanguageIntoForm(); }
   if (name === 'unused-files') renderUnusedFilesList();
   if (name === 'sync-history') renderSyncHistoryList();
   if (name === 'diagnostics') renderErrorLog();
@@ -2571,6 +2582,17 @@ syncCategoryChips.querySelectorAll('.chip').forEach(chip => {
   chip.addEventListener('click', () => applySyncCategory(chip.dataset.category));
 });
 
+function getCloudProvider() {
+  return localStorage.getItem('cloud_provider') || 'google-drive';
+}
+function applyCloudProvider(provider) {
+  localStorage.setItem('cloud_provider', provider);
+  document.getElementById('cloud-provider-select').value = provider;
+  document.getElementById('cloud-provider-google-drive').style.display = provider === 'google-drive' ? 'block' : 'none';
+  document.getElementById('cloud-provider-dropbox').style.display = provider === 'dropbox' ? 'block' : 'none';
+}
+document.getElementById('cloud-provider-select').addEventListener('change', (e) => applyCloudProvider(e.target.value));
+
 function refreshSyncUI() {
   const setupBtn = document.getElementById('sync-setup-btn');
   const nowBtn = document.getElementById('sync-now-btn');
@@ -2612,10 +2634,11 @@ function getSyncIntervalMinutes() {
 function setupSyncIntervalTimer() {
   clearInterval(syncIntervalTimer);
   const minutes = getSyncIntervalMinutes();
-  if (minutes > 0 && (syncHandle || driveFileId)) {
+  if (minutes > 0 && (syncHandle || driveFileId || dropboxConnected)) {
     syncIntervalTimer = setInterval(() => {
       if (syncHandle) performSync();
       if (driveFileId) performDriveSync();
+      if (dropboxConnected) performDropboxSync();
     }, minutes * 60 * 1000);
   }
 }
@@ -2661,6 +2684,7 @@ async function ensureSyncPermission() {
 
 let syncDebounceTimer = null;
 let driveSyncDebounceTimer = null;
+let dropboxSyncDebounceTimer = null;
 function scheduleSync() {
   if (syncHandle && supportsFSA) {
     clearTimeout(syncDebounceTimer);
@@ -2669,6 +2693,10 @@ function scheduleSync() {
   if (driveFileId) {
     clearTimeout(driveSyncDebounceTimer);
     driveSyncDebounceTimer = setTimeout(() => performDriveSync(), 1500);
+  }
+  if (dropboxConnected) {
+    clearTimeout(dropboxSyncDebounceTimer);
+    dropboxSyncDebounceTimer = setTimeout(() => performDropboxSync(), 1500);
   }
 }
 
@@ -3355,6 +3383,340 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
   }
 }
 
+// ================== Dropbox 同期 ==================
+const DROPBOX_APP_KEY = '946felny2io1h17';
+const DROPBOX_REDIRECT_URI = window.location.origin + '/';
+const DROPBOX_DATA_PATH = '/data.json';
+const DROPBOX_FILES_DIR = '/files';
+const DROPBOX_HISTORY_DIR = '/history';
+const DROPBOX_UNUSED_DIR = '/unused';
+const DROPBOX_LOCK_PATH = '/sync.lock';
+let dropboxAccessToken = null;
+let dropboxRefreshToken = null;
+let dropboxTokenExpiresAt = 0;
+let dropboxConnected = false;
+let dropboxSyncInProgress = false;
+
+function setDropboxStatus(text) {
+  const el = document.getElementById('dropbox-status');
+  if (el) el.textContent = text;
+}
+
+async function loadDropboxMeta() {
+  try {
+    const rec = await idbGet('meta', 'dropbox');
+    if (rec) {
+      dropboxRefreshToken = rec.refreshToken || null;
+      dropboxConnected = !!rec.connected;
+    }
+  } catch (err) { console.error('dropbox meta load failed', err); }
+}
+async function saveDropboxMeta() {
+  await idbPut('meta', { id: 'dropbox', refreshToken: dropboxRefreshToken, connected: dropboxConnected });
+}
+
+function refreshDropboxUI() {
+  const nowBtn = document.getElementById('dropbox-sync-now-btn');
+  const popupHint = document.getElementById('dropbox-popup-hint');
+  popupHint.style.display = isMobileUA ? 'block' : 'none';
+  if (!DROPBOX_APP_KEY) { setDropboxStatus(t('drive_permission_pending')); nowBtn.style.display = 'none'; return; }
+  if (dropboxConnected) {
+    setDropboxStatus(tf('drive_connected', { name: 'Dropbox' }));
+    nowBtn.style.display = 'block';
+  } else {
+    setDropboxStatus(t('drive_status_disconnected'));
+    nowBtn.style.display = 'none';
+  }
+}
+
+// ---- PKCE（クライアントシークレット不要のOAuth）用ヘルパー ----
+function base64UrlEncode(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function randomPkceString(length) {
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return base64UrlEncode(arr.buffer).slice(0, length);
+}
+async function sha256Base64Url(input) {
+  const enc = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return base64UrlEncode(digest);
+}
+
+async function refreshDropboxAccessToken() {
+  if (!dropboxRefreshToken) return false;
+  try {
+    const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: dropboxRefreshToken, client_id: DROPBOX_APP_KEY }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    dropboxAccessToken = data.access_token;
+    dropboxTokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
+    return true;
+  } catch (err) { console.error('dropbox token refresh failed', err); return false; }
+}
+
+async function exchangeDropboxCode(code, verifier) {
+  try {
+    const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY,
+        redirect_uri: DROPBOX_REDIRECT_URI, code_verifier: verifier,
+      }),
+    });
+    if (!res.ok) { const text = await res.text(); throw new Error(text.slice(0, 200)); }
+    const data = await res.json();
+    dropboxAccessToken = data.access_token;
+    dropboxRefreshToken = data.refresh_token;
+    dropboxTokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
+    await saveDropboxMeta();
+    return true;
+  } catch (err) {
+    console.error('dropbox code exchange failed', err);
+    setDropboxStatus(t('drive_connect_failed') + err.message);
+    return false;
+  }
+}
+
+// ポップアップでDropboxの認可画面を開き、リダイレクト後のcodeを回収する
+async function dropboxPopupAuth() {
+  const verifier = randomPkceString(64);
+  const challenge = await sha256Base64Url(verifier);
+  const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(DROPBOX_REDIRECT_URI)}&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline`;
+  const popup = window.open(authUrl, 'dropbox-auth', 'width=500,height=650');
+  if (!popup) { setDropboxStatus(t('alert_popup_blocked')); return false; }
+  return new Promise((resolve) => {
+    const timer = setInterval(async () => {
+      if (popup.closed) { clearInterval(timer); resolve(false); return; }
+      let href;
+      try { href = popup.location.href; } catch (e) { return; } // dropbox.com滞在中はクロスオリジンで読めない（正常）
+      if (href && href.indexOf(DROPBOX_REDIRECT_URI) === 0) {
+        clearInterval(timer);
+        const url = new URL(href);
+        const code = url.searchParams.get('code');
+        popup.close();
+        if (!code) { resolve(false); return; }
+        resolve(await exchangeDropboxCode(code, verifier));
+      }
+    }, 400);
+  });
+}
+
+async function requestDropboxToken({ silent = false } = {}) {
+  if (dropboxRefreshToken) {
+    const ok = await refreshDropboxAccessToken();
+    if (ok) return true;
+  }
+  if (silent) return false;
+  return await dropboxPopupAuth();
+}
+
+async function dropboxRpcFetch(path, body) {
+  if (!dropboxAccessToken || Date.now() >= dropboxTokenExpiresAt) {
+    const ok = await requestDropboxToken({ silent: true });
+    if (!ok) throw new Error('Dropboxに未接続です');
+  }
+  const res = await fetch(`https://api.dropboxapi.com/2${path}`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + dropboxAccessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) { const text = await res.text(); throw new Error(`Dropbox APIエラー（${res.status}）：${text.slice(0, 200)}`); }
+  return res;
+}
+async function dropboxDownload(path) {
+  if (!dropboxAccessToken || Date.now() >= dropboxTokenExpiresAt) {
+    const ok = await requestDropboxToken({ silent: true });
+    if (!ok) throw new Error('Dropboxに未接続です');
+  }
+  const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + dropboxAccessToken, 'Dropbox-API-Arg': JSON.stringify({ path }) },
+  });
+  if (res.status === 409) return null; // ファイルが存在しない
+  if (!res.ok) { const text = await res.text(); throw new Error(`Dropbox APIエラー（${res.status}）：${text.slice(0, 200)}`); }
+  return res;
+}
+async function dropboxUpload(path, body) {
+  if (!dropboxAccessToken || Date.now() >= dropboxTokenExpiresAt) {
+    const ok = await requestDropboxToken({ silent: true });
+    if (!ok) throw new Error('Dropboxに未接続です');
+  }
+  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + dropboxAccessToken,
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', autorename: false, mute: true }),
+      'Content-Type': 'application/octet-stream',
+    },
+    body,
+  });
+  if (!res.ok) { const text = await res.text(); throw new Error(`Dropbox APIエラー（${res.status}）：${text.slice(0, 200)}`); }
+  return res;
+}
+async function dropboxFileExists(path) {
+  try { await dropboxRpcFetch('/files/get_metadata', { path }); return true; }
+  catch (err) { return false; }
+}
+async function dropboxListFolder(path) {
+  try {
+    const res = await dropboxRpcFetch('/files/list_folder', { path });
+    const data = await res.json();
+    return data.entries || [];
+  } catch (err) { return []; }
+}
+async function moveDropboxFile(fromPath, toPath) {
+  await dropboxRpcFetch('/files/move_v2', { from_path: fromPath, to_path: toPath, autorename: true }).catch(() => {});
+}
+
+async function pushDropboxFiles() {
+  const allFiles = await idbGetAll('files');
+  for (const rec of allFiles) {
+    const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
+    const inFiles = await dropboxFileExists(`${DROPBOX_FILES_DIR}/${fname}`);
+    const inUnused = inFiles ? false : await dropboxFileExists(`${DROPBOX_UNUSED_DIR}/${fname}`);
+    if (inFiles || inUnused) continue;
+    try { await dropboxUpload(`${DROPBOX_FILES_DIR}/${fname}`, rec.blob); }
+    catch (err) { console.error('dropbox file upload failed', fname, err); }
+  }
+}
+
+// 紐付けが外れたファイルは削除せず「unused」フォルダへ移動する（再び参照されたら戻す）
+async function reconcileDropboxFileLocations() {
+  const referencedNames = new Set(
+    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
+  );
+  for (const f of await dropboxListFolder(DROPBOX_FILES_DIR)) {
+    if (f['.tag'] === 'file' && !referencedNames.has(f.name)) {
+      await moveDropboxFile(`${DROPBOX_FILES_DIR}/${f.name}`, `${DROPBOX_UNUSED_DIR}/${f.name}`);
+    }
+  }
+  for (const f of await dropboxListFolder(DROPBOX_UNUSED_DIR)) {
+    if (f['.tag'] === 'file' && referencedNames.has(f.name)) {
+      await moveDropboxFile(`${DROPBOX_UNUSED_DIR}/${f.name}`, `${DROPBOX_FILES_DIR}/${f.name}`);
+    }
+  }
+}
+
+async function importMissingDropboxFiles(data) {
+  for (const score of (data.scores || [])) {
+    if (!score.image_file_id) continue;
+    const existing = await idbGet('files', score.image_file_id).catch(() => null);
+    if (existing) continue;
+    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
+    try {
+      let res = await dropboxDownload(`${DROPBOX_FILES_DIR}/${fname}`);
+      if (!res) res = await dropboxDownload(`${DROPBOX_UNUSED_DIR}/${fname}`);
+      if (!res) { console.error('missing dropbox file', fname); continue; }
+      const blob = await res.blob();
+      await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
+    } catch (err) { console.error('missing dropbox file', fname, err); }
+  }
+  clearFileUrlCache();
+}
+
+async function backupDropboxHistory() {
+  try {
+    const res = await dropboxDownload(DROPBOX_DATA_PATH);
+    if (!res) return;
+    const text = await res.text();
+    if (!text.trim()) return;
+    const fname = `data-${timestampForFilename()}.json`;
+    await dropboxUpload(`${DROPBOX_HISTORY_DIR}/${fname}`, text);
+    const files = (await dropboxListFolder(DROPBOX_HISTORY_DIR)).filter(f => f['.tag'] === 'file').sort((a, b) => a.name.localeCompare(b.name));
+    const excess = files.length - HISTORY_KEEP_COUNT;
+    for (let i = 0; i < excess; i++) {
+      await dropboxRpcFetch('/files/delete_v2', { path: `${DROPBOX_HISTORY_DIR}/${files[i].name}` }).catch(() => {});
+    }
+  } catch (err) { console.error('dropbox history backup failed', err); }
+}
+
+document.getElementById('dropbox-connect-btn').addEventListener('click', async () => {
+  const ok = await requestDropboxToken({ silent: false });
+  if (!ok) return;
+  setDropboxStatus(t('drive_connecting'));
+  try {
+    // クラウド側に既にデータがあるか確認する。あれば取り込むだけにし、
+    // この端末の（空かもしれない）状態で上書きしてしまわないようにする。
+    const res = await dropboxDownload(DROPBOX_DATA_PATH);
+    const existingText = res ? await res.text() : '';
+    dropboxConnected = true;
+    await saveDropboxMeta();
+    refreshDropboxUI();
+    await performDropboxSync({ forceWrite: !existingText.trim() });
+    setupSyncIntervalTimer();
+  } catch (err) {
+    setDropboxStatus(t('drive_connect_failed') + err.message);
+  }
+});
+document.getElementById('dropbox-sync-now-btn').addEventListener('click', () => performDropboxSync({ manual: true }));
+
+function dropboxLockIO() {
+  return {
+    async read() {
+      const res = await dropboxDownload(DROPBOX_LOCK_PATH);
+      if (!res) return null;
+      const text = await res.text();
+      return text.trim() ? JSON.parse(text) : null;
+    },
+    async write(lockData) { await dropboxUpload(DROPBOX_LOCK_PATH, JSON.stringify(lockData)); },
+    async remove() { await dropboxRpcFetch('/files/delete_v2', { path: DROPBOX_LOCK_PATH }).catch(() => {}); },
+  };
+}
+
+async function performDropboxSync({ forceWrite = false, manual = false } = {}) {
+  if (!dropboxConnected || dropboxSyncInProgress) return;
+  dropboxSyncInProgress = true;
+  startSyncSpin();
+  let lockAcquired = false;
+  const lockIO = dropboxLockIO();
+  try {
+    if (!dropboxAccessToken || Date.now() >= dropboxTokenExpiresAt) {
+      const ok = await requestDropboxToken({ silent: true });
+      if (!ok) { setDropboxStatus(t('drive_reauth_needed')); return; }
+    }
+    lockAcquired = await acquireSyncLock(lockIO);
+    if (!lockAcquired) { setDropboxStatus(t('sync_other_device_syncing')); return; }
+
+    if (!forceWrite) {
+      const res = await dropboxDownload(DROPBOX_DATA_PATH);
+      const text = res ? await res.text() : '';
+      const remoteData = text.trim() ? JSON.parse(text) : {};
+      await applyRemoteWithLocalOverlay(remoteData);
+      await importMissingDropboxFiles({ scores: db.scores });
+      if (!hasAnyPendingChanges()) {
+        await reconcileDropboxFileLocations();
+        setDropboxStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
+        return;
+      }
+    }
+
+    await pushDropboxFiles();
+    await reconcileDropboxFileLocations();
+    await backupDropboxHistory();
+    const data = await buildExportData();
+    await dropboxUpload(DROPBOX_DATA_PATH, JSON.stringify(data));
+    dropboxConnected = true;
+    await saveDropboxMeta();
+    clearPendingChanges();
+    setDropboxStatus(t('sync_done') + new Date().toLocaleTimeString());
+  } catch (err) {
+    logError('dropbox sync failed: ' + err.message);
+    setDropboxStatus(t('alert_sync_failed') + err.message);
+    if (manual) alert(t('alert_sync_failed') + err.message);
+  } finally {
+    if (lockAcquired) await releaseSyncLock(lockIO);
+    dropboxSyncInProgress = false;
+    stopSyncSpin();
+  }
+}
+
 // ================== 未使用ファイルの管理 ==================
 async function getUnusedFileRecords() {
   const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
@@ -3382,6 +3744,15 @@ async function deleteFileEverywhere(rec) {
         }
       }
     } catch (err) { console.error('drive file delete failed', fname, err); }
+  }
+  if (dropboxConnected) {
+    try {
+      for (const dir of [DROPBOX_FILES_DIR, DROPBOX_UNUSED_DIR]) {
+        if (await dropboxFileExists(`${dir}/${fname}`)) {
+          await dropboxRpcFetch('/files/delete_v2', { path: `${dir}/${fname}` }).catch(() => {});
+        }
+      }
+    } catch (err) { console.error('dropbox file delete failed', fname, err); }
   }
 }
 
@@ -3453,11 +3824,17 @@ async function listDriveHistoryEntries() {
   } catch (err) { console.error('list drive history failed', err); return []; }
 }
 
+async function listDropboxHistoryEntries() {
+  if (!dropboxConnected) return [];
+  const files = (await dropboxListFolder(DROPBOX_HISTORY_DIR)).filter(f => f['.tag'] === 'file').sort((a, b) => b.name.localeCompare(a.name));
+  return files.map(f => ({ source: 'dropbox', name: f.name, path: `${DROPBOX_HISTORY_DIR}/${f.name}` }));
+}
+
 async function renderSyncHistoryList() {
   const container = document.getElementById('sync-history-list');
   container.innerHTML = `<div class="empty">${t('loading_status')}</div>`;
-  const [localEntries, driveEntries] = await Promise.all([listLocalHistoryEntries(), listDriveHistoryEntries()]);
-  const all = [...localEntries, ...driveEntries];
+  const [localEntries, driveEntries, dropboxEntries] = await Promise.all([listLocalHistoryEntries(), listDriveHistoryEntries(), listDropboxHistoryEntries()]);
+  const all = [...localEntries, ...driveEntries, ...dropboxEntries];
   if (all.length === 0) {
     container.innerHTML = `<div class="empty">${t('no_history_yet')}</div>`;
     return;
@@ -3467,7 +3844,7 @@ async function renderSyncHistoryList() {
     const row = document.createElement('div');
     row.className = 'concert-row';
     row.innerHTML = `
-      <span>${escapeHtml(formatHistoryLabel(entry.name))}<span class="count"> ・ ${entry.source === 'local' ? t('source_folder') : 'Google Drive'}</span></span>
+      <span>${escapeHtml(formatHistoryLabel(entry.name))}<span class="count"> ・ ${entry.source === 'local' ? t('source_folder') : entry.source === 'dropbox' ? 'Dropbox' : 'Google Drive'}</span></span>
       <div class="actions"><button type="button" class="restore">${t('btn_restore_this')}</button></div>
     `;
     row.querySelector('.restore').addEventListener('click', () => restoreFromHistoryEntry(entry));
@@ -3491,10 +3868,12 @@ async function restoreImportedDataFull(data) {
   // 復元した内容に必要なファイルを取得しておく（files/unusedどちらにあっても探す）
   if (syncFilesDirHandle) await importMissingLocalFiles(data);
   if (driveFilesFolderId) await importMissingDriveFiles(data);
+  if (dropboxConnected) await importMissingDropboxFiles(data);
   renderResults();
   // 復元は「これが正しい状態」として、強制的に同期先へ上書きする
   if (syncHandle) await performSync({ forceWrite: true });
   if (driveFileId) await performDriveSync({ forceWrite: true });
+  if (dropboxConnected) await performDropboxSync({ forceWrite: true });
 }
 
 async function restoreFromHistoryEntry(entry) {
@@ -3504,6 +3883,9 @@ async function restoreFromHistoryEntry(entry) {
     if (entry.source === 'local') {
       const file = await entry.handle.getFile();
       text = await file.text();
+    } else if (entry.source === 'dropbox') {
+      const res = await dropboxDownload(entry.path);
+      text = await res.text();
     } else {
       const res = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${entry.id}?alt=media`);
       text = await res.text();
@@ -3653,6 +4035,7 @@ function applyTranslations() {
   // 接続状態などの現在値は、翻訳の巻き込みで消えないよう改めて反映する
   refreshSyncUI();
   refreshDriveUI();
+  refreshDropboxUI();
 
   renderResults();
 }
@@ -3791,8 +4174,10 @@ if ('serviceWorker' in navigator) {
     await loadData();
     await loadSyncMeta();
     await loadDriveMeta();
+    await loadDropboxMeta();
     refreshSyncUI();
     refreshDriveUI();
+    refreshDropboxUI();
     renderResults();
     if (syncHandle) {
       await performSync();
@@ -3800,6 +4185,10 @@ if ('serviceWorker' in navigator) {
     }
     if (driveFileId) {
       await performDriveSync();
+      setupSyncIntervalTimer();
+    }
+    if (dropboxConnected) {
+      await performDropboxSync();
       setupSyncIntervalTimer();
     }
   } catch (err) {
