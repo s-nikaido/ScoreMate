@@ -496,7 +496,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.021</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.022</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -2394,6 +2394,11 @@ function fileNameFor(id, mime, createdAt) {
   const dateStr = (createdAt || nowIso()).slice(0, 10).replace(/-/g, '');
   return `${dateStr}_${id}.${extForMime(mime)}`;
 }
+// 「日付_ID.拡張子」という命名規則から、日付ぶれの影響を受けないID部分だけを取り出す
+function fileIdFromStoredName(name) {
+  const m = name.match(/^\d{8}_(.+)\.[^.]+$/);
+  return m ? m[1] : name;
+}
 function timestampForFilename() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -2834,21 +2839,19 @@ async function reconcileLocalFileLocations() {
   if (!syncFilesDirHandle || !syncDirHandle) return;
   const unusedDir = await ensureLocalUnusedDir();
   if (!unusedDir) return;
-  const referencedNames = new Set(
-    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
-  );
+  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
   try {
     const filesNames = [];
     for await (const [name] of syncFilesDirHandle.entries()) filesNames.push(name);
     for (const name of filesNames) {
-      if (!referencedNames.has(name)) {
+      if (!referencedIds.has(fileIdFromStoredName(name))) {
         await moveLocalFileEntry(syncFilesDirHandle, unusedDir, name);
       }
     }
     const unusedNames = [];
     for await (const [name] of unusedDir.entries()) unusedNames.push(name);
     for (const name of unusedNames) {
-      if (referencedNames.has(name)) {
+      if (referencedIds.has(fileIdFromStoredName(name))) {
         await moveLocalFileEntry(unusedDir, syncFilesDirHandle, name);
       }
     }
@@ -2862,17 +2865,18 @@ async function importMissingLocalFiles(data) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
-    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     let fh = null;
-    try { fh = await syncFilesDirHandle.getFileHandle(fname); } catch (e) { /* filesに無ければunusedを探す */ }
-    if (!fh && unusedDir) {
-      try { fh = await unusedDir.getFileHandle(fname); } catch (e) { /* どちらにも無い */ }
+    for (const dir of [syncFilesDirHandle, unusedDir].filter(Boolean)) {
+      for await (const [name, handle] of dir.entries()) {
+        if (fileIdFromStoredName(name) === score.image_file_id) { fh = handle; break; }
+      }
+      if (fh) break;
     }
-    if (!fh) { console.error('missing local file', fname); continue; }
+    if (!fh) { console.error('missing local file', score.image_file_id); continue; }
     try {
       const file = await fh.getFile();
       await idbPut('files', { id: score.image_file_id, blob: file, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing local file', fname, err); }
+    } catch (err) { console.error('missing local file', score.image_file_id, err); }
   }
   clearFileUrlCache();
 }
@@ -3170,6 +3174,15 @@ async function findDriveFileInFolder(folderId, fname) {
   return (listData.files && listData.files[0]) ? listData.files[0].id : null;
 }
 
+// 日付部分がずれていても、ファイル名に埋め込まれたIDで探し当てる
+async function findDriveFileById(folderId, fileRecId) {
+  const q = encodeURIComponent(`name contains '${fileRecId}' and '${folderId}' in parents and trashed=false`);
+  const listRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+  const listData = await listRes.json();
+  const match = (listData.files || []).find(f => fileIdFromStoredName(f.name) === fileRecId);
+  return match ? match.id : null;
+}
+
 async function moveDriveFile(fileId, fromFolderId, toFolderId) {
   await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${toFolderId}&removeParents=${fromFolderId}`, {
     method: 'PATCH',
@@ -3182,8 +3195,8 @@ async function pushDriveFiles() {
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
     const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
-    let exists = !!(await findDriveFileInFolder(driveFilesFolderId, fname));
-    if (!exists && unusedFolderId) exists = !!(await findDriveFileInFolder(unusedFolderId, fname));
+    let exists = !!(await findDriveFileById(driveFilesFolderId, rec.id));
+    if (!exists && unusedFolderId) exists = !!(await findDriveFileById(unusedFolderId, rec.id));
     if (exists) continue;
 
     try {
@@ -3213,15 +3226,13 @@ async function reconcileDriveFileLocations() {
   if (!driveFilesFolderId || !driveFolderId) return;
   const unusedFolderId = await findOrCreateDriveUnusedFolder();
   if (!unusedFolderId) return;
-  const referencedNames = new Set(
-    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
-  );
+  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
   try {
     const qFiles = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
     const listFilesRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${qFiles}&fields=files(id,name)`);
     const listFiles = await listFilesRes.json();
     for (const f of (listFiles.files || [])) {
-      if (!referencedNames.has(f.name)) {
+      if (!referencedIds.has(fileIdFromStoredName(f.name))) {
         await moveDriveFile(f.id, driveFilesFolderId, unusedFolderId).catch(() => {});
       }
     }
@@ -3229,7 +3240,7 @@ async function reconcileDriveFileLocations() {
     const listUnusedRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${qUnused}&fields=files(id,name)`);
     const listUnused = await listUnusedRes.json();
     for (const f of (listUnused.files || [])) {
-      if (referencedNames.has(f.name)) {
+      if (referencedIds.has(fileIdFromStoredName(f.name))) {
         await moveDriveFile(f.id, unusedFolderId, driveFilesFolderId).catch(() => {});
       }
     }
@@ -3243,15 +3254,14 @@ async function importMissingDriveFiles(data) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
-    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     try {
-      let fileId = await findDriveFileInFolder(driveFilesFolderId, fname);
-      if (!fileId && unusedFolderId) fileId = await findDriveFileInFolder(unusedFolderId, fname);
-      if (!fileId) { console.error('missing drive file', fname); continue; }
+      let fileId = await findDriveFileById(driveFilesFolderId, score.image_file_id);
+      if (!fileId && unusedFolderId) fileId = await findDriveFileById(unusedFolderId, score.image_file_id);
+      if (!fileId) { console.error('missing drive file', score.image_file_id); continue; }
       const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       const blob = await contentRes.blob();
       await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing drive file', fname, err); }
+    } catch (err) { console.error('missing drive file', score.image_file_id, err); }
   }
   clearFileUrlCache();
 }
@@ -3575,13 +3585,19 @@ async function moveDropboxFile(fromPath, toPath) {
   await dropboxRpcFetch('/files/move_v2', { from_path: fromPath, to_path: toPath, autorename: true }).catch(() => {});
 }
 
+async function dropboxFindById(dirPath, fileRecId) {
+  const entries = await dropboxListFolder(dirPath);
+  const match = entries.find(f => f['.tag'] === 'file' && fileIdFromStoredName(f.name) === fileRecId);
+  return match ? match.name : null;
+}
+
 async function pushDropboxFiles() {
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
     const fname = rec.fileName || fileNameFor(rec.id, rec.type, rec.created_at);
-    const inFiles = await dropboxFileExists(`${DROPBOX_FILES_DIR}/${fname}`);
-    const inUnused = inFiles ? false : await dropboxFileExists(`${DROPBOX_UNUSED_DIR}/${fname}`);
-    if (inFiles || inUnused) continue;
+    const existingInFiles = await dropboxFindById(DROPBOX_FILES_DIR, rec.id);
+    const existingInUnused = existingInFiles ? null : await dropboxFindById(DROPBOX_UNUSED_DIR, rec.id);
+    if (existingInFiles || existingInUnused) continue;
     try { await dropboxUpload(`${DROPBOX_FILES_DIR}/${fname}`, rec.blob); }
     catch (err) { console.error('dropbox file upload failed', fname, err); }
   }
@@ -3589,16 +3605,14 @@ async function pushDropboxFiles() {
 
 // 紐付けが外れたファイルは削除せず「unused」フォルダへ移動する（再び参照されたら戻す）
 async function reconcileDropboxFileLocations() {
-  const referencedNames = new Set(
-    db.scores.filter(s => s.image_file_id).map(s => s.image_file_name || fileNameFor(s.image_file_id, s.image_type))
-  );
+  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
   for (const f of await dropboxListFolder(DROPBOX_FILES_DIR)) {
-    if (f['.tag'] === 'file' && !referencedNames.has(f.name)) {
+    if (f['.tag'] === 'file' && !referencedIds.has(fileIdFromStoredName(f.name))) {
       await moveDropboxFile(`${DROPBOX_FILES_DIR}/${f.name}`, `${DROPBOX_UNUSED_DIR}/${f.name}`);
     }
   }
   for (const f of await dropboxListFolder(DROPBOX_UNUSED_DIR)) {
-    if (f['.tag'] === 'file' && referencedNames.has(f.name)) {
+    if (f['.tag'] === 'file' && referencedIds.has(fileIdFromStoredName(f.name))) {
       await moveDropboxFile(`${DROPBOX_UNUSED_DIR}/${f.name}`, `${DROPBOX_FILES_DIR}/${f.name}`);
     }
   }
@@ -3609,14 +3623,17 @@ async function importMissingDropboxFiles(data) {
     if (!score.image_file_id) continue;
     const existing = await idbGet('files', score.image_file_id).catch(() => null);
     if (existing) continue;
-    const fname = score.image_file_name || fileNameFor(score.image_file_id, score.image_type);
     try {
-      let res = await dropboxDownload(`${DROPBOX_FILES_DIR}/${fname}`);
-      if (!res) res = await dropboxDownload(`${DROPBOX_UNUSED_DIR}/${fname}`);
-      if (!res) { console.error('missing dropbox file', fname); continue; }
+      let name = await dropboxFindById(DROPBOX_FILES_DIR, score.image_file_id);
+      let res = name ? await dropboxDownload(`${DROPBOX_FILES_DIR}/${name}`) : null;
+      if (!res) {
+        name = await dropboxFindById(DROPBOX_UNUSED_DIR, score.image_file_id);
+        res = name ? await dropboxDownload(`${DROPBOX_UNUSED_DIR}/${name}`) : null;
+      }
+      if (!res) { console.error('missing dropbox file', score.image_file_id); continue; }
       const blob = await res.blob();
       await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing dropbox file', fname, err); }
+    } catch (err) { console.error('missing dropbox file', score.image_file_id, err); }
   }
   clearFileUrlCache();
 }
