@@ -823,7 +823,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '1.0.1'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
+const APP_VERSION = '1.0.3'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -2001,6 +2001,7 @@ async function renderConcertProgramList(query = '') {
   resultsEl.appendChild(list);
   await appendWorkCards(worksInConcert, list, { dragHandle: !searching, concertId: drillDown.id });
   if (searching) return;
+  if (typeof Sortable === 'undefined') return;
 
   new Sortable(list, {
     handle: '.drag-handle',
@@ -4889,7 +4890,7 @@ document.getElementById('font-custom-input').addEventListener('input', (e) => {
 const HELP_TOPICS = {
   ja: [
     { id: 'basics', title: '基本的な使い方', body: '「登録」から写真を撮影・選択して楽譜を登録します。曲名は必須、作曲家・パートは空欄でも登録できます。複数枚の写真を選ぶと自動的に1つのPDFにまとめられます。' },
-    { id: 'tabs', title: '検索画面の4つのタブ', body: '<b>曲名</b>：登録した楽曲を曲名の頭文字でグループ表示します（「全て表示」に切替可）。<br><b>演奏会</b>：演奏会（開催年でグループ表示）を選ぶと、その演奏会で演奏した曲の一覧が、ドラッグ（左の「⠿」）で並べ替えできる形で表示されます。プログラム順の管理や、PDF一括出力の並び用に使えます。<br><b>作曲家</b>：作曲家（頭文字・邦人でグループ表示）を選ぶと、その作曲家の曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。<br><b>パート</b>：パートを選ぶと、そのパートの楽譜がある曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。' },
+    { id: 'tabs', title: '検索画面の4つのタブ', body: '<b>曲名</b>：登録した楽曲を曲名の頭文字でグループ表示します（「全て表示」に切替可）。<br><b>演奏会</b>：演奏会（開催年でグループ表示）を選ぶと、その演奏会で演奏した曲の一覧が、右側の「⠿」をドラッグして並べ替えできる形で表示されます。プログラム順の管理や、PDF一括出力の並び用に使えます。<br><b>作曲家</b>：作曲家（頭文字・邦人でグループ表示）を選ぶと、その作曲家の曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。<br><b>パート</b>：パートを選ぶと、そのパートの楽譜がある曲一覧が曲名頭文字でグループ表示されます（「全て表示」に切替可）。' },
     { id: 'concert-attach', title: '演奏会のプログラム・写真', body: '演奏会の曲順画面（検索→演奏会→選択）の上部から、プログラム（1回の追加で選んだ写真は1つのPDFに自動結合、A4には統一されません）や、当日の写真を、それぞれ何回でも追加できます。プログラムは表・裏や複数種類を別々に残せます。写真は通信量・保存容量の節約のため、体感で画質が落ちたと分かりにくい範囲で自動的にリサイズ・圧縮されます。外しても本体はすぐ削除されず<a href="#" class="help-jump" data-topic="unused">未使用ファイル</a>に残ります。' },
     { id: 'concert-video', title: '演奏会の動画リンク・再生', body: '演奏会の曲順画面で、各曲の右側にある「動画を追加」を押すと、その曲名でYouTubeを検索した結果が新しいタブで開きます。良さそうな動画のURLをコピーし、表示される入力欄に貼り付けると登録され、以後はアプリを離れずその場で再生できます（▶ボタン）。リンクが1つでもある演奏会では「▶ 全曲を順番に再生」ボタンが表示され、曲順に沿って自動的に次の曲へ進みます。楽譜の編集画面（演奏履歴の一覧）からも、同じように各演奏会ごとに動画を追加・再生できます（新規登録の保存前はまだ追加できません）。音声ファイルそのものの登録は現在対応していません（通信量への影響を抑えるため）。' },
     { id: 'pdf-export', title: '印刷用PDFの一括出力', body: '検索結果で楽譜のチェックボックスを選ぶと、画面下に選択件数と「PDFに書き出す」ボタンが表示されます。選んだ楽譜（画像・PDF混在可）をまとめて1つのPDFに結合してダウンロードできます。' },
@@ -4904,7 +4905,7 @@ const HELP_TOPICS = {
   ],
   en: [
     { id: 'basics', title: 'Basic Usage', body: 'Use "Add" to photograph or select a score. A title is required; composer and part can be left blank. Multiple photos are automatically combined into one PDF.' },
-    { id: 'tabs', title: 'The 4 Search Tabs', body: '<b>Title</b>: Scores grouped by the first letter of the title ("Show All" anytime).<br><b>Concert</b>: Concerts are grouped by year. Pick one to see its program — drag the "⠿" handle on the left to reorder pieces, useful for the running order or a bulk PDF export.<br><b>Composer</b>: Composers grouped by initial letter / Japanese composers. Pick one to see their works, grouped by title\'s first letter.<br><b>Part</b>: Pick a part to see works with a score for it, grouped by title\'s first letter.' },
+    { id: 'tabs', title: 'The 4 Search Tabs', body: '<b>Title</b>: Scores grouped by the first letter of the title ("Show All" anytime).<br><b>Concert</b>: Concerts are grouped by year. Pick one to see its program — drag the "⠿" handle on the right to reorder pieces, useful for the running order or a bulk PDF export.<br><b>Composer</b>: Composers grouped by initial letter / Japanese composers. Pick one to see their works, grouped by title\'s first letter.<br><b>Part</b>: Pick a part to see works with a score for it, grouped by title\'s first letter.' },
     { id: 'concert-attach', title: 'Concert Program & Photos', body: 'From the top of a concert\'s program screen (Search → Concert → pick one), add a program (each time you add, the photos you select are combined into one PDF, not forced to A4) or any number of photos from the day — either can be added as many times as you like, so you can keep separate programs (e.g. front and back, or different versions). Photos are automatically resized and compressed within a range that shouldn\'t be noticeable, to save data usage and storage. Removing one doesn\'t delete the file right away — it stays in <a href="#" class="help-jump" data-topic="unused">Unused Files</a>.' },
     { id: 'concert-video', title: 'Concert Video Links & Playback', body: 'On a concert\'s program screen, tap "Add Video" next to a piece to open a YouTube search for that title in a new tab. Copy the URL of a good match, paste it into the field that appears, and it\'s registered — tap the ▶ button afterward to play it right in the app. If a concert has at least one video linked, a "▶ Play All in Order" button appears and automatically advances through the pieces in program order. You can also add or play videos per concert from a score\'s edit screen (in the performance history list) — not available until the score has been saved once. Uploading audio files directly isn\'t supported yet, to keep data usage low.' },
     { id: 'pdf-export', title: 'Bulk PDF Export for Printing', body: 'Check the boxes next to scores in search results — a bar with a selection count and "Export as PDF" appears at the bottom. It combines the selected scores (images and PDFs can be mixed) into a single downloadable PDF.' },
