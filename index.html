@@ -117,7 +117,7 @@
   }
   .help-topic-toggle .arrow { color: var(--text-muted); font-size: 12px; transition: transform 0.15s; flex-shrink: 0; margin-left: 8px; }
   .help-topic-toggle.open .arrow { transform: rotate(90deg); }
-  .help-topic-body { display: none; padding: 0 2px 14px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .help-topic-body { display: none; padding: 0 2px 14px 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
   .help-topic-body.open { display: block; }
   .help-topic-body b { color: var(--text); }
   .help-topic-body a.help-jump { color: var(--accent); text-decoration: underline; cursor: pointer; }
@@ -406,7 +406,6 @@
             <option value="google-drive">Google Drive</option>
             <option value="dropbox">Dropbox</option>
           </select>
-          <p id="drive-experimental-note" style="font-size:11px; color:var(--text-muted); margin:0 0 12px;">PC向けの実験的な機能です。</p>
           <p id="drive-mobile-note" style="font-size:12px; color:var(--text-muted); display:none;">スマートフォンのブラウザではまだ対応していません。PCのChrome・Edgeなどでお使いください。</p>
           <div id="cloud-provider-google-drive">
             <div id="drive-pc-ui">
@@ -812,7 +811,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.054'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.057'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1626,9 +1625,9 @@ async function renderConcertAttachmentsSection(concertId) {
   const photoFiles = concert.photo_files || [];
   for (const p of photoFiles) {
     const thumbWrap = document.createElement('div');
-    thumbWrap.style.cssText = 'position:relative; width:64px; height:64px;';
+    thumbWrap.style.cssText = 'position:relative; width:92px; height:92px;';
     const img = document.createElement('img');
-    img.style.cssText = 'width:64px; height:64px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid var(--border); background:var(--bg);';
+    img.style.cssText = 'width:92px; height:92px; object-fit:contain; border-radius:6px; cursor:pointer; border:1px solid var(--border); background:var(--bg);';
     getFileUrl(p.id).then(url => { if (url) img.src = url; });
     img.addEventListener('click', () => openFileForViewing(p.id));
     const delBtn = document.createElement('button');
@@ -2031,11 +2030,22 @@ async function compressPhotoFile(file, { maxDim = 1600, quality = 0.82 } = {}) {
 }
 async function imagesToPdfFile(files, { fitToPage = true } = {}) {
   const { jsPDF } = window.jspdf;
+  const MIN_PAGE_PT = 350; // 極端に小さい画像（誤って選んだロゴ等）でもページが小さくなりすぎないようにする下限
   let doc = null;
   for (let i = 0; i < files.length; i++) {
-    const dataUrl = await fileToDataUrl(files[i]);
-    const img = await loadImageEl(dataUrl);
-    const format = files[i].type.includes('png') ? 'PNG' : 'JPEG';
+    let dataUrl = await fileToDataUrl(files[i]);
+    let img = await loadImageEl(dataUrl);
+    // jsPDFが直接扱えるのはJPEG/PNG/WEBPのみのため、GIF等それ以外はPNGへ変換し直す
+    const isDirectlySupported = /^(image\/jpe?g|image\/png|image\/webp)$/.test(files[i].type);
+    let format = files[i].type.includes('png') ? 'PNG' : (files[i].type.includes('webp') ? 'WEBP' : 'JPEG');
+    if (!isDirectlySupported) {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width; canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      dataUrl = canvas.toDataURL('image/png');
+      img = await loadImageEl(dataUrl);
+      format = 'PNG';
+    }
     if (fitToPage) {
       // 楽譜など：常にA4サイズに統一する
       if (!doc) doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -2047,8 +2057,10 @@ async function imagesToPdfFile(files, { fitToPage = true } = {}) {
       if (i > 0) doc.addPage();
       doc.addImage(dataUrl, format, x, y, w, h);
     } else {
-      // プログラム等：撮影した用紙のサイズ・向きをそのままページサイズにする
-      const ptW = img.width * 0.75, ptH = img.height * 0.75; // px(96dpi)→pt換算
+      // プログラム等：撮影した用紙のサイズ・向きをそのままページサイズにする（ただし小さすぎる場合は下限まで拡大）
+      const rawW = img.width * 0.75, rawH = img.height * 0.75; // px(96dpi)→pt換算
+      const upscale = Math.max(1, MIN_PAGE_PT / Math.min(rawW, rawH));
+      const ptW = rawW * upscale, ptH = rawH * upscale;
       if (!doc) doc = new jsPDF({ unit: 'pt', format: [ptW, ptH] });
       else doc.addPage([ptW, ptH]);
       doc.addImage(dataUrl, format, 0, 0, ptW, ptH);
@@ -2770,7 +2782,7 @@ function computeReferencedFileIds() {
   const ids = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
   for (const c of db.concerts) {
     if (c.program_file_id) ids.add(c.program_file_id);
-    for (const pid of (c.photo_file_ids || [])) ids.add(pid);
+    for (const photo of (c.photo_files || [])) ids.add(photo.id);
   }
   return ids;
 }
@@ -2836,7 +2848,7 @@ document.getElementById('export-btn').addEventListener('click', async () => {
     works: db.works, scores: db.scores, composers: db.composers, parts: db.parts,
     concerts: db.concerts, performances: db.performances, files: [],
   };
-  const fileIds = new Set(db.scores.map(s => s.image_file_id).filter(Boolean));
+  const fileIds = computeReferencedFileIds();
   for (const id of fileIds) {
     const rec = await getImageFile(id);
     if (rec) data.files.push({ id: rec.id, type: rec.type, base64: await blobToBase64(rec.blob) });
@@ -2905,9 +2917,8 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   await loadData();
   renderResults();
   alert(t('alert_import_done'));
-  // インポートした内容全体を、同期先へ確実に反映させる
-  if (syncHandle) await performSync({ forceWrite: true });
-  if (driveFileId) await performDriveSync({ forceWrite: true });
+  // インポートした内容全体を、現在選択中の同期先へ確実に反映させる
+  await syncActiveDestination({ forceWrite: true });
   e.target.value = '';
 });
 
@@ -2999,14 +3010,24 @@ syncHeaderBtn.addEventListener('click', async () => {
     alert(t('alert_need_sync_target'));
     return;
   }
-  if (syncHandle) await performSync({ manual: true });
-  if (driveFileId) await performDriveSync({ manual: true });
-  if (dropboxConnected) await performDropboxSync({ manual: true });
+  await syncActiveDestination({ manual: true });
 });
 
 // ---- 自動同期の間隔設定 ----
 const syncIntervalSelect = document.getElementById('sync-interval-select');
 let syncIntervalTimer = null;
+
+// 現在「設定」で選択されている保存方法だけを同期対象にする（他に接続情報が残っていても対象にしない）
+function getActiveSyncKind() {
+  if (getSyncCategory() === 'local') return 'local';
+  return getCloudProvider() === 'dropbox' ? 'dropbox' : 'google-drive';
+}
+async function syncActiveDestination(options) {
+  const kind = getActiveSyncKind();
+  if (kind === 'local' && syncHandle) return performSync(options);
+  if (kind === 'google-drive' && driveFileId) return performDriveSync(options);
+  if (kind === 'dropbox' && dropboxConnected) return performDropboxSync(options);
+}
 
 function getSyncIntervalMinutes() {
   const v = parseInt(localStorage.getItem('sync_interval_minutes') || '15', 10);
@@ -3016,11 +3037,7 @@ function setupSyncIntervalTimer() {
   clearInterval(syncIntervalTimer);
   const minutes = getSyncIntervalMinutes();
   if (minutes > 0 && (syncHandle || driveFileId || dropboxConnected)) {
-    syncIntervalTimer = setInterval(() => {
-      if (syncHandle) performSync();
-      if (driveFileId) performDriveSync();
-      if (dropboxConnected) performDropboxSync();
-    }, minutes * 60 * 1000);
+    syncIntervalTimer = setInterval(() => { syncActiveDestination(); }, minutes * 60 * 1000);
   }
 }
 syncIntervalSelect.addEventListener('change', () => {
@@ -3064,21 +3081,9 @@ async function ensureSyncPermission() {
 }
 
 let syncDebounceTimer = null;
-let driveSyncDebounceTimer = null;
-let dropboxSyncDebounceTimer = null;
 function scheduleSync() {
-  if (syncHandle && supportsFSA) {
-    clearTimeout(syncDebounceTimer);
-    syncDebounceTimer = setTimeout(() => performSync(), 1500);
-  }
-  if (driveFileId) {
-    clearTimeout(driveSyncDebounceTimer);
-    driveSyncDebounceTimer = setTimeout(() => performDriveSync(), 1500);
-  }
-  if (dropboxConnected) {
-    clearTimeout(dropboxSyncDebounceTimer);
-    dropboxSyncDebounceTimer = setTimeout(() => performDropboxSync(), 1500);
-  }
+  clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => syncActiveDestination(), 1500);
 }
 
 const BACKUP_FORMAT_VERSION = 1;
@@ -4047,7 +4052,8 @@ async function exchangeDropboxCode(code, verifier) {
 async function dropboxPopupAuth() {
   const verifier = randomPkceString(64);
   const challenge = await sha256Base64Url(verifier);
-  const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(DROPBOX_REDIRECT_URI)}&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline`;
+  const state = randomPkceString(24);
+  const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(DROPBOX_REDIRECT_URI)}&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline&state=${state}`;
   const popup = window.open(authUrl, 'dropbox-auth', 'width=500,height=650');
   if (!popup) { setDropboxStatus(t('alert_popup_blocked')); return false; }
   return new Promise((resolve) => {
@@ -4059,8 +4065,9 @@ async function dropboxPopupAuth() {
         clearInterval(timer);
         const url = new URL(href);
         const code = url.searchParams.get('code');
+        const returnedState = url.searchParams.get('state');
         popup.close();
-        if (!code) { resolve(false); return; }
+        if (!code || returnedState !== state) { resolve(false); return; }
         resolve(await exchangeDropboxCode(code, verifier));
       }
     }, 400);
@@ -4454,10 +4461,8 @@ async function restoreImportedDataFull(data) {
   if (driveFilesFolderId) await reconcileDriveFileLocations().catch(err => console.error('reconcile drive after restore failed', err));
   if (dropboxConnected) await reconcileDropboxFileLocations().catch(err => console.error('reconcile dropbox after restore failed', err));
   renderResults();
-  // 復元は「これが正しい状態」として、強制的に同期先へ上書きする
-  if (syncHandle) await performSync({ forceWrite: true });
-  if (driveFileId) await performDriveSync({ forceWrite: true });
-  if (dropboxConnected) await performDropboxSync({ forceWrite: true });
+  // 復元は「これが正しい状態」として、選択中の同期先へ強制的に上書きする
+  await syncActiveDestination({ forceWrite: true });
 }
 
 async function restoreFromHistoryEntry(entry) {
@@ -4739,7 +4744,6 @@ function applyTranslations() {
   document.getElementById('sync-folder-hint').textContent = t('sync_folder_hint');
   document.getElementById('sync-now-btn').textContent = t('btn_sync_now');
   document.getElementById('label-cloud-provider').textContent = t('label_cloud_provider');
-  document.getElementById('drive-experimental-note').textContent = t('drive_experimental_note');
   document.getElementById('drive-connect-btn').textContent = t('btn_connect_drive');
   document.getElementById('drive-popup-hint').textContent = t('drive_popup_hint');
   document.getElementById('drive-sync-now-btn').textContent = t('btn_sync_now');
@@ -4933,16 +4937,8 @@ if ('serviceWorker' in navigator) {
     refreshDropboxUI();
     renderResults();
     if (!localStorage.getItem('onboarding_seen')) openOnboarding();
-    if (syncHandle) {
-      await performSync();
-      setupSyncIntervalTimer();
-    }
-    if (driveFileId) {
-      await performDriveSync();
-      setupSyncIntervalTimer();
-    }
-    if (dropboxConnected) {
-      await performDropboxSync();
+    if (syncHandle || driveFileId || dropboxConnected) {
+      await syncActiveDestination();
       setupSyncIntervalTimer();
     }
   } catch (err) {
