@@ -466,7 +466,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.045</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.046</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -3022,14 +3022,14 @@ async function performFullExport() {
     const zip = new JSZip();
     const filesFolder = zip.folder('files');
     const referencedIds = computeReferencedFileIds();
-    let storedFileCount = 0;
+    let fileCount = 0;
     for (const id of referencedIds) {
       const rec = await idbGet('files', id).catch(() => null);
       if (!rec || !rec.blob) continue;
       const score = db.scores.find(s => s.image_file_id === id);
       const fname = rec.fileName || (score && score.image_file_name) || fileNameFor(id, rec.type, rec.created_at);
       filesFolder.file(fname, rec.blob);
-      storedFileCount++;
+      fileCount++;
     }
 
     const manifest = {
@@ -3041,7 +3041,7 @@ async function performFullExport() {
       composerCount: db.composers.length,
       partCount: db.parts.length,
       concertCount: db.concerts.length,
-      fileCount: storedFileCount, // 実際にzipのfiles/へ格納したファイル数
+      fileCount, // 実際にzipのfiles/へ格納したファイル数
     };
     zip.file('manifest.json', JSON.stringify(manifest, null, 2));
     zip.file('data.json', JSON.stringify(data, null, 2));
