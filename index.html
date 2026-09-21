@@ -151,7 +151,7 @@
 
   .work-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
   .work-card { -webkit-user-select: none; -moz-user-select: none; user-select: none; }
-  .work-card-dragging, .work-card.sortable-fallback { opacity: 1 !important; box-shadow: 0 4px 14px rgba(58,46,31,0.28); border: 2px solid var(--accent) !important; background: var(--surface) !important; }
+  .work-card-dragging, .work-card.sortable-fallback { opacity: 0.9 !important; box-shadow: 0 4px 14px rgba(58,46,31,0.28); border: 2px solid var(--accent) !important; background: var(--surface) !important; }
   .work-card .work-header { padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 8px; }
   .work-header .title { font-family: var(--font-serif); font-size: 16px; font-weight: 400; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .work-header .sub { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -826,7 +826,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.081'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.082'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
