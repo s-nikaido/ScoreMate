@@ -589,7 +589,7 @@ const I18N = {
     diagnostics_orphan_part: '存在しないパートを参照している楽譜が{count}件あります（パート未設定に修復されます）',
     diagnostics_orphan_file: '存在しないファイルを参照している楽譜が{count}件あります（添付なしに修復されます）',
     diagnostics_orphan_perf_score: '存在しない楽譜を参照している演奏履歴が{count}件あります（削除されます）',
-    diagnostics_orphan_perf_concert: '存在しない演奏会を参照している演奏履歴が{count}件あります（削除されます）',
+    diagnostics_orphan_perf_concert: '存在しない演奏会を参照している演奏履歴が{count}件あります（削除されます）', diagnostics_orphan_concert_program: '本体が見つからないプログラムを参照している演奏会が{count}件あります（参照を解除します）', diagnostics_orphan_concert_photo: '本体が見つからない写真を参照している演奏会が{count}件あります（参照を解除します）',
     alert_import_done: 'インポートが完了しました',
     alert_need_api_key: '先にAPIキーを入力してください',
     alert_fetch_failed: '取得に失敗しました：',
@@ -707,7 +707,7 @@ const I18N = {
     diagnostics_orphan_part: '{count} score(s) reference a part that no longer exists (will be reset to unset)',
     diagnostics_orphan_file: '{count} score(s) reference a file that no longer exists (attachment will be cleared)',
     diagnostics_orphan_perf_score: '{count} performance record(s) reference a score that no longer exists (will be deleted)',
-    diagnostics_orphan_perf_concert: '{count} performance record(s) reference a concert that no longer exists (will be deleted)',
+    diagnostics_orphan_perf_concert: '{count} performance record(s) reference a concert that no longer exists (will be deleted)', diagnostics_orphan_concert_program: '{count} concert(s) reference a program file that no longer exists (reference will be cleared)', diagnostics_orphan_concert_photo: '{count} concert(s) reference one or more photos that no longer exist (references will be cleared)',
     alert_import_done: 'Import complete',
     alert_need_api_key: 'Please enter an API key first',
     alert_fetch_failed: 'Fetch failed: ',
@@ -808,7 +808,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.049'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.050'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -4687,6 +4687,8 @@ async function runDiagnostics() {
   const orphanScoresFile = db.scores.filter(s => s.image_file_id && !fileIds.has(s.image_file_id));
   const orphanPerfScore = db.performances.filter(p => !scoreIds.has(p.score_id));
   const orphanPerfConcert = db.performances.filter(p => !concertIds.has(p.concert_id));
+  const orphanConcertProgram = db.concerts.filter(c => c.program_file_id && !fileIds.has(c.program_file_id));
+  const orphanConcertPhoto = db.concerts.filter(c => (c.photo_files || []).some(p => !fileIds.has(p.id)));
 
   if (orphanWorks.length) issues.push({ key: 'orphan_composer', count: orphanWorks.length, fix: () => fixOrphanComposer(orphanWorks) });
   if (orphanScoresWork.length) issues.push({ key: 'orphan_work', count: orphanScoresWork.length, fix: () => fixOrphanScoresWork(orphanScoresWork) });
@@ -4694,6 +4696,8 @@ async function runDiagnostics() {
   if (orphanScoresFile.length) issues.push({ key: 'orphan_file', count: orphanScoresFile.length, fix: () => fixOrphanFile(orphanScoresFile) });
   if (orphanPerfScore.length) issues.push({ key: 'orphan_perf_score', count: orphanPerfScore.length, fix: () => fixOrphanPerfScore(orphanPerfScore) });
   if (orphanPerfConcert.length) issues.push({ key: 'orphan_perf_concert', count: orphanPerfConcert.length, fix: () => fixOrphanPerfConcert(orphanPerfConcert) });
+  if (orphanConcertProgram.length) issues.push({ key: 'orphan_concert_program', count: orphanConcertProgram.length, fix: () => fixOrphanConcertProgram(orphanConcertProgram) });
+  if (orphanConcertPhoto.length) issues.push({ key: 'orphan_concert_photo', count: orphanConcertPhoto.length, fix: () => fixOrphanConcertPhoto(orphanConcertPhoto) });
   return issues;
 }
 
@@ -4717,6 +4721,18 @@ async function fixOrphanPerfScore(list) {
 async function fixOrphanPerfConcert(list) {
   for (const p of list) { await idbDelete('performances', p.id); markDeleted('performances', p.id); }
   db.performances = db.performances.filter(p => !list.includes(p));
+}
+async function fixOrphanConcertProgram(list) {
+  for (const c of list) { c.program_file_id = null; c.program_file_type = null; c.program_file_name = null; await idbPut('concerts', c); markChanged('concerts', c.id); }
+}
+async function fixOrphanConcertPhoto(list) {
+  const fileRecords = await idbGetAll('files');
+  const fileIds = new Set(fileRecords.map(f => f.id));
+  for (const c of list) {
+    c.photo_files = (c.photo_files || []).filter(p => fileIds.has(p.id));
+    await idbPut('concerts', c);
+    markChanged('concerts', c.id);
+  }
 }
 
 async function renderDiagnostics() {
