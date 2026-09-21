@@ -823,7 +823,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.087'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.088'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1069,6 +1069,8 @@ function ensureYoutubeApi() {
   return youtubeApiReadyPromise;
 }
 let ytPlayer = null;
+let ytPlayerReadyPromise = null;
+let ytPlayerReadyResolve = null;
 let playQueue = [];
 let playQueueIndex = -1;
 async function startPlayerAt(index) {
@@ -1079,12 +1081,17 @@ async function startPlayerAt(index) {
   document.getElementById('player-bar').style.display = 'flex';
   document.getElementById('player-bar-title').textContent = track.title;
   if (!ytPlayer) {
+    ytPlayerReadyPromise = new Promise((resolve) => { ytPlayerReadyResolve = resolve; });
     ytPlayer = new YT.Player('yt-player-frame', {
       height: '68', width: '120', videoId: track.videoId,
       playerVars: { autoplay: 1, playsinline: 1 },
-      events: { onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) startPlayerAt(playQueueIndex + 1); } },
+      events: {
+        onReady: () => { if (ytPlayerReadyResolve) { ytPlayerReadyResolve(); ytPlayerReadyResolve = null; } },
+        onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) startPlayerAt(playQueueIndex + 1); },
+      },
     });
   } else {
+    await ytPlayerReadyPromise; // プレイヤーの準備が終わるまで、動画の切り替えを待つ
     ytPlayer.loadVideoById(track.videoId);
   }
 }
