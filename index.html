@@ -539,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.040</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.041</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -3360,6 +3360,12 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileLocalFileLocations();
+        try {
+          const csvHandle = await syncDirHandle.getFileHandle('index.csv', { create: true });
+          const csvWritable = await csvHandle.createWritable();
+          await csvWritable.write('\uFEFF' + buildFullExportIndexCsv());
+          await csvWritable.close();
+        } catch (err) { console.error('local sync csv write failed', err); }
         setSyncStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
         return;
       }
@@ -3846,6 +3852,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileDriveFileLocations();
+        await writeDriveTextFile(driveFolderId, 'index.csv', '\uFEFF' + buildFullExportIndexCsv(), 'text/csv').catch(err => console.error('drive sync csv write failed', err));
         setDriveStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
         return;
       }
@@ -4198,6 +4205,7 @@ async function performDropboxSync({ forceWrite = false, manual = false } = {}) {
       await importMissingDropboxFiles({ scores: db.scores });
       if (!hasAnyPendingChanges()) {
         await reconcileDropboxFileLocations();
+        await dropboxUpload('/index.csv', '\uFEFF' + buildFullExportIndexCsv()).catch(err => console.error('dropbox sync csv write failed', err));
         setDropboxStatus(t('sync_pulled_latest') + new Date().toLocaleTimeString());
         return;
       }
