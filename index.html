@@ -539,7 +539,7 @@
     </section>
   </main>
 
-  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.039</footer>
+  <footer class="app-footer">© 2026 NIKAIDO Works. All Rights Reserved. ・ ScoreMate v2.040</footer>
 </div>
 
 <div id="sync-center-banner">更新中…</div>
@@ -580,7 +580,7 @@ const I18N = {
   ja: {
     menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
     menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断', menu_help: 'ヘルプ', menu_label_master: 'マスタ管理', menu_label_data: 'データ管理',
-    menu_export: 'エクスポート（バックアップ）', menu_full_export: '完全エクスポート', menu_import: 'インポート（復元）', alert_full_export_failed: '完全エクスポートに失敗しました：',
+    menu_export: 'エクスポート（バックアップ）', menu_full_export: '完全エクスポート', menu_import: 'インポート（復元）', alert_full_export_failed: '完全エクスポートに失敗しました：', concert_program_label: 'プログラム', concert_photos_label: '写真', btn_view_program: 'プログラムを見る', btn_add_program: 'プログラムを追加', btn_add_photos: '写真を追加', btn_remove: '削除', confirm_remove_program: 'プログラムを削除しますか？（ファイル本体は未使用ファイルに残ります）', confirm_remove_photo: 'この写真を削除しますか？（ファイル本体は未使用ファイルに残ります）', alert_program_save_failed: 'プログラムの保存に失敗しました：', alert_photo_save_failed: '写真の保存に失敗しました：', photo_count_warning: '写真の枚数が多いと、同期に時間がかかる場合があります。',
     search_placeholder: '検索',
     filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
     label_title: '曲名 *', label_composer: '作曲家', label_part: 'パート名', label_memo: 'メモ',
@@ -698,7 +698,7 @@ const I18N = {
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
     menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics', menu_help: 'Help', menu_label_master: 'Master Data', menu_label_data: 'Data Management',
-    menu_export: 'Export (Backup)', menu_full_export: 'Full Export', menu_import: 'Import (Restore)', alert_full_export_failed: 'Full export failed: ',
+    menu_export: 'Export (Backup)', menu_full_export: 'Full Export', menu_import: 'Import (Restore)', alert_full_export_failed: 'Full export failed: ', concert_program_label: 'Program', concert_photos_label: 'Photos', btn_view_program: 'View Program', btn_add_program: 'Add Program', btn_add_photos: 'Add Photos', btn_remove: 'Remove', confirm_remove_program: 'Remove the program? (The file itself stays in Unused Files.)', confirm_remove_photo: 'Remove this photo? (The file itself stays in Unused Files.)', alert_program_save_failed: 'Failed to save program: ', alert_photo_save_failed: 'Failed to save photo: ', photo_count_warning: 'A large number of photos may slow down syncing.',
     search_placeholder: 'Search',
     filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
     label_title: 'Title *', label_composer: 'Composer', label_part: 'Part', label_memo: 'Notes',
@@ -987,6 +987,14 @@ async function saveImageFile(file) {
   await idbPut('files', { id, blob: file, type: file.type, created_at: createdAt, fileName });
   return { id, fileName };
 }
+// プログラム・写真など、種別プレフィックス付きファイル名で保存する
+async function saveAuxFile(prefix, file) {
+  const id = genId();
+  const createdAt = nowIso();
+  const fileName = auxFileNameFor(prefix, id, file.type, createdAt);
+  await idbPut('files', { id, blob: file, type: file.type, created_at: createdAt, fileName });
+  return { id, fileName, type: file.type };
+}
 async function getImageFile(id) { return id ? idbGet('files', id) : null; }
 async function deleteImageFile(id) { if (id) await idbDelete('files', id); }
 
@@ -1093,6 +1101,22 @@ async function mergeConcertInto(sourceId, targetId) {
     p.concert_id = targetId;
     await idbPut('performances', p);
     markChanged('performances', p.id);
+  }
+  // 統合元にプログラム・写真が付いていれば、統合先へ引き継ぐ
+  const source = db.concerts.find(c => c.id === sourceId);
+  const target = db.concerts.find(c => c.id === targetId);
+  if (source && target) {
+    if (source.program_file_id && !target.program_file_id) {
+      target.program_file_id = source.program_file_id;
+      target.program_file_type = source.program_file_type;
+      target.program_file_name = source.program_file_name;
+    }
+    if (source.photo_files && source.photo_files.length > 0) {
+      const existingIds = new Set((target.photo_files || []).map(p => p.id));
+      target.photo_files = [...(target.photo_files || []), ...source.photo_files.filter(p => !existingIds.has(p.id))];
+    }
+    await idbPut('concerts', target);
+    markChanged('concerts', target.id);
   }
   await idbDelete('concerts', sourceId);
   db.concerts = db.concerts.filter(c => c.id !== sourceId);
@@ -1491,7 +1515,176 @@ async function renderDrillDownList(query = '') {
 }
 
 // 演奏会の中の曲順を、ドラッグで並べ替えられる形で表示する
+// ================== 演奏会のプログラム・写真 ==================
+async function setConcertProgram(concertId, file) {
+  const stored = await saveAuxFile('program', file);
+  const concert = db.concerts.find(c => c.id === concertId);
+  if (!concert) return;
+  concert.program_file_id = stored.id;
+  concert.program_file_type = stored.type;
+  concert.program_file_name = stored.fileName;
+  await idbPut('concerts', concert);
+  markChanged('concerts', concert.id);
+}
+async function clearConcertProgram(concertId) {
+  const concert = db.concerts.find(c => c.id === concertId);
+  if (!concert) return;
+  concert.program_file_id = null;
+  concert.program_file_type = null;
+  concert.program_file_name = null;
+  await idbPut('concerts', concert);
+  markChanged('concerts', concert.id);
+}
+async function addConcertPhotos(concertId, files) {
+  const concert = db.concerts.find(c => c.id === concertId);
+  if (!concert) return;
+  concert.photo_files = concert.photo_files || [];
+  for (const file of files) {
+    const stored = await saveAuxFile('photo', file);
+    concert.photo_files.push({ id: stored.id, type: stored.type });
+  }
+  await idbPut('concerts', concert);
+  markChanged('concerts', concert.id);
+}
+async function removeConcertPhoto(concertId, fileId) {
+  const concert = db.concerts.find(c => c.id === concertId);
+  if (!concert) return;
+  concert.photo_files = (concert.photo_files || []).filter(p => p.id !== fileId);
+  await idbPut('concerts', concert);
+  markChanged('concerts', concert.id);
+}
+async function openFileForViewing(fileId) {
+  const url = await getFileUrl(fileId);
+  if (!url) return;
+  if (isMobileUA) window.location.href = url;
+  else window.open(url, '_blank');
+}
+const PHOTO_COUNT_WARNING_THRESHOLD = 20;
+
+async function renderConcertAttachmentsSection(concertId) {
+  const concert = concertById(concertId);
+  if (!concert) return;
+  const box = document.createElement('div');
+  box.style.cssText = 'margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border);';
+
+  const progTitle = document.createElement('p');
+  progTitle.textContent = t('concert_program_label');
+  progTitle.style.cssText = 'font-family:var(--font-serif); font-size:14px; margin:0 0 8px;';
+  box.appendChild(progTitle);
+
+  const progRow = document.createElement('div');
+  progRow.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;';
+  if (concert.program_file_id) {
+    const viewBtn = document.createElement('button');
+    viewBtn.type = 'button';
+    viewBtn.textContent = t('btn_view_program');
+    viewBtn.style.cssText = 'padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:12px; cursor:pointer;';
+    viewBtn.addEventListener('click', () => openFileForViewing(concert.program_file_id));
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = t('btn_remove');
+    removeBtn.style.cssText = 'padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text-muted); font-size:12px; cursor:pointer;';
+    removeBtn.addEventListener('click', async () => {
+      if (!confirm(t('confirm_remove_program'))) return;
+      await clearConcertProgram(concertId);
+      scheduleSync();
+      renderResults();
+    });
+    progRow.appendChild(viewBtn);
+    progRow.appendChild(removeBtn);
+  } else {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.textContent = t('btn_add_program');
+    addBtn.style.cssText = 'padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:12px; cursor:pointer;';
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*,application/pdf'; input.multiple = true; input.style.display = 'none';
+    input.addEventListener('change', async () => {
+      const files = [...input.files];
+      if (files.length === 0) return;
+      addBtn.disabled = true;
+      try {
+        const images = files.filter(f => f.type.startsWith('image/'));
+        // プログラムは楽譜と違い、撮影したサイズ・向きのままページ化する（A4に統一しない）
+        const toSave = images.length > 0 ? await imagesToPdfFile(images, { fitToPage: false }) : files[0];
+        await setConcertProgram(concertId, toSave);
+        scheduleSync();
+        renderResults();
+      } catch (err) { alert(t('alert_program_save_failed') + err.message); }
+      finally { addBtn.disabled = false; }
+    });
+    addBtn.addEventListener('click', () => input.click());
+    progRow.appendChild(addBtn);
+    progRow.appendChild(input);
+  }
+  box.appendChild(progRow);
+
+  const photoTitle = document.createElement('p');
+  photoTitle.textContent = t('concert_photos_label');
+  photoTitle.style.cssText = 'font-family:var(--font-serif); font-size:14px; margin:0 0 8px;';
+  box.appendChild(photoTitle);
+
+  const photoGrid = document.createElement('div');
+  photoGrid.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;';
+  const photoFiles = concert.photo_files || [];
+  for (const p of photoFiles) {
+    const thumbWrap = document.createElement('div');
+    thumbWrap.style.cssText = 'position:relative; width:64px; height:64px;';
+    const img = document.createElement('img');
+    img.style.cssText = 'width:64px; height:64px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid var(--border); background:var(--bg);';
+    getFileUrl(p.id).then(url => { if (url) img.src = url; });
+    img.addEventListener('click', () => openFileForViewing(p.id));
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = '×';
+    delBtn.title = t('btn_remove');
+    delBtn.style.cssText = 'position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; border:none; background:var(--text-muted); color:var(--surface); font-size:12px; line-height:1; cursor:pointer;';
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(t('confirm_remove_photo'))) return;
+      await removeConcertPhoto(concertId, p.id);
+      scheduleSync();
+      renderResults();
+    });
+    thumbWrap.appendChild(img);
+    thumbWrap.appendChild(delBtn);
+    photoGrid.appendChild(thumbWrap);
+  }
+  box.appendChild(photoGrid);
+  if (photoFiles.length >= PHOTO_COUNT_WARNING_THRESHOLD) {
+    const warn = document.createElement('p');
+    warn.textContent = t('photo_count_warning');
+    warn.style.cssText = 'font-size:11px; color:var(--text-muted); margin:0 0 8px;';
+    box.appendChild(warn);
+  }
+
+  const addPhotosBtn = document.createElement('button');
+  addPhotosBtn.type = 'button';
+  addPhotosBtn.textContent = t('btn_add_photos');
+  addPhotosBtn.style.cssText = 'padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:12px; cursor:pointer;';
+  const photosInput = document.createElement('input');
+  photosInput.type = 'file'; photosInput.accept = 'image/*'; photosInput.multiple = true; photosInput.style.display = 'none';
+  photosInput.addEventListener('change', async () => {
+    const files = [...photosInput.files];
+    if (files.length === 0) return;
+    addPhotosBtn.disabled = true;
+    try {
+      await addConcertPhotos(concertId, files);
+      scheduleSync();
+      renderResults();
+    } catch (err) { alert(t('alert_photo_save_failed') + err.message); }
+    finally { addPhotosBtn.disabled = false; }
+  });
+  addPhotosBtn.addEventListener('click', () => photosInput.click());
+  box.appendChild(addPhotosBtn);
+  box.appendChild(photosInput);
+
+  resultsEl.appendChild(box);
+}
+
 async function renderConcertProgramList(query = '') {
+  await renderConcertAttachmentsSection(drillDown.id);
+
   const worksInConcert = db.works
     .map(w => ({ work: w, scores: scoresForWork(w.id) }))
     .filter(({ scores }) => scores.some(s => performancesForScore(s.id).some(p => p.concert_id === drillDown.id)))
@@ -1785,20 +1978,30 @@ function loadImageEl(src) {
     img.src = src;
   });
 }
-async function imagesToPdfFile(files) {
+async function imagesToPdfFile(files, { fitToPage = true } = {}) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' }); // 保存されるPDFは常にA4サイズに統一する
+  let doc = null;
   for (let i = 0; i < files.length; i++) {
     const dataUrl = await fileToDataUrl(files[i]);
     const img = await loadImageEl(dataUrl);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const ratio = Math.min(pageWidth / img.width, pageHeight / img.height);
-    const w = img.width * ratio, h = img.height * ratio;
-    const x = (pageWidth - w) / 2, y = (pageHeight - h) / 2;
-    if (i > 0) doc.addPage();
     const format = files[i].type.includes('png') ? 'PNG' : 'JPEG';
-    doc.addImage(dataUrl, format, x, y, w, h);
+    if (fitToPage) {
+      // 楽譜など：常にA4サイズに統一する
+      if (!doc) doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const ratio = Math.min(pageWidth / img.width, pageHeight / img.height);
+      const w = img.width * ratio, h = img.height * ratio;
+      const x = (pageWidth - w) / 2, y = (pageHeight - h) / 2;
+      if (i > 0) doc.addPage();
+      doc.addImage(dataUrl, format, x, y, w, h);
+    } else {
+      // プログラム等：撮影した用紙のサイズ・向きをそのままページサイズにする
+      const ptW = img.width * 0.75, ptH = img.height * 0.75; // px(96dpi)→pt換算
+      if (!doc) doc = new jsPDF({ unit: 'pt', format: [ptW, ptH] });
+      else doc.addPage([ptW, ptH]);
+      doc.addImage(dataUrl, format, 0, 0, ptW, ptH);
+    }
   }
   const blob = doc.output('blob');
   return new File([blob], 'scan.pdf', { type: 'application/pdf' });
@@ -2503,8 +2706,22 @@ function fileNameFor(id, mime, createdAt) {
 }
 // 「日付_ID.拡張子」という命名規則から、日付ぶれの影響を受けないID部分だけを取り出す
 function fileIdFromStoredName(name) {
-  const m = name.match(/^\d{8}_(.+)\.[^.]+$/);
+  const m = name.match(/^(?:(?:score|program|photo)_)?\d{8}_(.+)\.[^.]+$/);
   return m ? m[1] : name;
+}
+// 付随種別（プログラム・写真）のファイル名は「種別_日付_ID.拡張子」とする
+function auxFileNameFor(prefix, id, mime, createdAt) {
+  const dateStr = (createdAt || nowIso()).slice(0, 10).replace(/-/g, '');
+  return `${prefix}_${dateStr}_${id}.${extForMime(mime)}`;
+}
+// 楽譜・演奏会プログラム・演奏会写真、いずれかから参照されているファイルIDの集合
+function computeReferencedFileIds() {
+  const ids = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  for (const c of db.concerts) {
+    if (c.program_file_id) ids.add(c.program_file_id);
+    for (const pid of (c.photo_file_ids || [])) ids.add(pid);
+  }
+  return ids;
 }
 function timestampForFilename() {
   const d = new Date();
@@ -2879,7 +3096,7 @@ async function performFullExport() {
     zip.file('data.json', JSON.stringify(data, null, 2));
     zip.file('index.csv', '\uFEFF' + indexCsv); // Excelでの文字化け対策でBOMを付与
     const filesFolder = zip.folder('files');
-    const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+    const referencedIds = computeReferencedFileIds();
     for (const id of referencedIds) {
       const rec = await idbGet('files', id).catch(() => null);
       if (!rec || !rec.blob) continue;
@@ -2936,7 +3153,7 @@ async function applyRemoteWithLocalOverlay(remoteData) {
 }
 
 async function cleanupOrphanLocalBlobs() {
-  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const referencedIds = computeReferencedFileIds();
   const allFiles = await idbGetAll('files');
   for (const rec of allFiles) {
     if (!referencedIds.has(rec.id)) {
@@ -3031,7 +3248,7 @@ async function reconcileLocalFileLocations() {
   if (!syncFilesDirHandle || !syncDirHandle) return;
   const unusedDir = await ensureLocalUnusedDir();
   if (!unusedDir) return;
-  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const referencedIds = computeReferencedFileIds();
   try {
     const filesNames = [];
     for await (const [name] of syncFilesDirHandle.entries()) filesNames.push(name);
@@ -3050,25 +3267,41 @@ async function reconcileLocalFileLocations() {
   } catch (err) { console.error('reconcile local file locations failed', err); }
 }
 
+// 楽譜・プログラム・写真のうち、まだこの端末に無いものだけを抽出する（同期時の不足ファイル取得で共用）
+async function collectNeededFileEntries(data) {
+  const entries = [];
+  for (const score of (data.scores || [])) {
+    if (score.image_file_id) entries.push({ id: score.image_file_id, type: score.image_type });
+  }
+  for (const concert of (data.concerts || [])) {
+    if (concert.program_file_id) entries.push({ id: concert.program_file_id, type: concert.program_file_type });
+    for (const p of (concert.photo_files || [])) entries.push({ id: p.id, type: p.type });
+  }
+  const needed = [];
+  for (const e of entries) {
+    const existing = await idbGet('files', e.id).catch(() => null);
+    if (!existing) needed.push(e);
+  }
+  return needed;
+}
+
 async function importMissingLocalFiles(data) {
   if (!syncFilesDirHandle) return;
   const unusedDir = await ensureLocalUnusedDir();
-  for (const score of (data.scores || [])) {
-    if (!score.image_file_id) continue;
-    const existing = await idbGet('files', score.image_file_id).catch(() => null);
-    if (existing) continue;
+  const needed = await collectNeededFileEntries(data);
+  for (const { id, type } of needed) {
     let fh = null;
     for (const dir of [syncFilesDirHandle, unusedDir].filter(Boolean)) {
       for await (const [name, handle] of dir.entries()) {
-        if (fileIdFromStoredName(name) === score.image_file_id) { fh = handle; break; }
+        if (fileIdFromStoredName(name) === id) { fh = handle; break; }
       }
       if (fh) break;
     }
-    if (!fh) { console.error('missing local file', score.image_file_id); continue; }
+    if (!fh) { console.error('missing local file', id); continue; }
     try {
       const file = await fh.getFile();
-      await idbPut('files', { id: score.image_file_id, blob: file, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing local file', score.image_file_id, err); }
+      await idbPut('files', { id, blob: file, type, created_at: nowIso() });
+    } catch (err) { console.error('missing local file', id, err); }
   }
   clearFileUrlCache();
 }
@@ -3456,7 +3689,7 @@ async function reconcileDriveFileLocations() {
   if (!driveFilesFolderId || !driveFolderId) return;
   const unusedFolderId = await findOrCreateDriveUnusedFolder();
   if (!unusedFolderId) return;
-  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const referencedIds = computeReferencedFileIds();
   try {
     const qFiles = encodeURIComponent(`'${driveFilesFolderId}' in parents and trashed=false`);
     const listFilesRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files?q=${qFiles}&fields=files(id,name)`);
@@ -3480,18 +3713,16 @@ async function reconcileDriveFileLocations() {
 async function importMissingDriveFiles(data) {
   if (!driveFilesFolderId) return;
   const unusedFolderId = await findOrCreateDriveUnusedFolder();
-  for (const score of (data.scores || [])) {
-    if (!score.image_file_id) continue;
-    const existing = await idbGet('files', score.image_file_id).catch(() => null);
-    if (existing) continue;
+  const needed = await collectNeededFileEntries(data);
+  for (const { id, type } of needed) {
     try {
-      let fileId = await findDriveFileById(driveFilesFolderId, score.image_file_id);
-      if (!fileId && unusedFolderId) fileId = await findDriveFileById(unusedFolderId, score.image_file_id);
-      if (!fileId) { console.error('missing drive file', score.image_file_id); continue; }
+      let fileId = await findDriveFileById(driveFilesFolderId, id);
+      if (!fileId && unusedFolderId) fileId = await findDriveFileById(unusedFolderId, id);
+      if (!fileId) { console.error('missing drive file', id); continue; }
       const contentRes = await driveApiFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       const blob = await contentRes.blob();
-      await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing drive file', score.image_file_id, err); }
+      await idbPut('files', { id, blob, type, created_at: nowIso() });
+    } catch (err) { console.error('missing drive file', id, err); }
   }
   clearFileUrlCache();
 }
@@ -3858,7 +4089,7 @@ async function pushDropboxFiles() {
 
 // 紐付けが外れたファイルは削除せず「unused」フォルダへ移動する（再び参照されたら戻す）
 async function reconcileDropboxFileLocations() {
-  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const referencedIds = computeReferencedFileIds();
   for (const f of await dropboxListFolder(DROPBOX_FILES_DIR)) {
     if (f['.tag'] === 'file' && !referencedIds.has(fileIdFromStoredName(f.name))) {
       await moveDropboxFile(`${DROPBOX_FILES_DIR}/${f.name}`, `${DROPBOX_UNUSED_DIR}/${f.name}`);
@@ -3872,21 +4103,19 @@ async function reconcileDropboxFileLocations() {
 }
 
 async function importMissingDropboxFiles(data) {
-  for (const score of (data.scores || [])) {
-    if (!score.image_file_id) continue;
-    const existing = await idbGet('files', score.image_file_id).catch(() => null);
-    if (existing) continue;
+  const needed = await collectNeededFileEntries(data);
+  for (const { id, type } of needed) {
     try {
-      let name = await dropboxFindById(DROPBOX_FILES_DIR, score.image_file_id);
+      let name = await dropboxFindById(DROPBOX_FILES_DIR, id);
       let res = name ? await dropboxDownload(`${DROPBOX_FILES_DIR}/${name}`) : null;
       if (!res) {
-        name = await dropboxFindById(DROPBOX_UNUSED_DIR, score.image_file_id);
+        name = await dropboxFindById(DROPBOX_UNUSED_DIR, id);
         res = name ? await dropboxDownload(`${DROPBOX_UNUSED_DIR}/${name}`) : null;
       }
-      if (!res) { console.error('missing dropbox file', score.image_file_id); continue; }
+      if (!res) { console.error('missing dropbox file', id); continue; }
       const blob = await res.blob();
-      await idbPut('files', { id: score.image_file_id, blob, type: score.image_type, created_at: nowIso() });
-    } catch (err) { console.error('missing dropbox file', score.image_file_id, err); }
+      await idbPut('files', { id, blob, type, created_at: nowIso() });
+    } catch (err) { console.error('missing dropbox file', id, err); }
   }
   clearFileUrlCache();
 }
@@ -3998,7 +4227,7 @@ async function performDropboxSync({ forceWrite = false, manual = false } = {}) {
 
 // ================== 未使用ファイルの管理 ==================
 async function getUnusedFileRecords() {
-  const referencedIds = new Set(db.scores.filter(s => s.image_file_id).map(s => s.image_file_id));
+  const referencedIds = computeReferencedFileIds();
   const allFiles = await idbGetAll('files');
   return allFiles.filter(rec => !referencedIds.has(rec.id));
 }
