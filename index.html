@@ -518,6 +518,7 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.9.0-release.1/dist/opencv.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
@@ -599,7 +600,7 @@ const I18N = {
     alert_saved: '保存しました',
     alert_need_gemini_key_settings: '先に「設定」画面でGemini APIキーを保存してください',
     alert_select_photo_first: '写真またはPDFを選択してから読み取ってください（複数枚選んでいる場合は1枚目のみ読み取ります）',
-    alert_need_sync_target: '先に「設定」画面で同期先を設定してください',
+    alert_need_sync_target: '先に「設定」画面で同期先を設定してください', alert_active_sync_not_set: '現在選択中の保存方法がまだ設定されていません。「設定」画面で接続してください（他の保存先の接続情報が残っていても、選択中でなければ同期されません）。',
     alert_setup_failed: '設定に失敗しました：',
     alert_sync_failed: '同期に失敗しました：', fatal_init_error: 'アプリの起動に失敗しました。保存されているデータは失われていません。再読み込みしてもう一度お試しください。エラー内容：',
     alert_feature_not_ready: 'この機能は現在準備中です',
@@ -717,7 +718,7 @@ const I18N = {
     alert_saved: 'Saved',
     alert_need_gemini_key_settings: 'Please save your Gemini API key in Settings first',
     alert_select_photo_first: 'Please select a photo or PDF before reading (if multiple are selected, only the first will be read)',
-    alert_need_sync_target: 'Please set up a sync destination in Settings first',
+    alert_need_sync_target: 'Please set up a sync destination in Settings first', alert_active_sync_not_set: 'The currently selected sync method isn\'t set up yet. Please connect it in Settings (other destinations may still be connected, but they won\'t sync unless selected).',
     alert_setup_failed: 'Setup failed: ',
     alert_sync_failed: 'Sync failed: ', fatal_init_error: 'The app failed to start. Your saved data has not been lost. Please reload and try again. Error details: ',
     alert_feature_not_ready: 'This feature is not yet available',
@@ -811,7 +812,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.057'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.059'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1156,6 +1157,34 @@ function deleteFileUrlCacheEntry(id) {
   const url = fileUrlCache.get(id);
   if (url) URL.revokeObjectURL(url);
   fileUrlCache.delete(id);
+}
+// PDFの1ページ目をサムネイル用の画像（データURL）にする
+const pdfThumbCache = new Map();
+async function getPdfThumbnailDataUrl(fileId) {
+  if (pdfThumbCache.has(fileId)) return pdfThumbCache.get(fileId);
+  try {
+    const rec = await getImageFile(fileId);
+    if (!rec || !rec.blob) return null;
+    if (pdfjsLib.GlobalWorkerOptions.workerSrc !== 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';
+    }
+    const buf = await rec.blob.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = 220 / Math.max(viewport.width, viewport.height);
+    const scaledViewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+    const dataUrl = canvas.toDataURL('image/png');
+    pdfThumbCache.set(fileId, dataUrl);
+    return dataUrl;
+  } catch (err) {
+    console.error('pdf thumbnail generation failed', fileId, err);
+    return null;
+  }
 }
 async function getFileUrl(fileId) {
   if (!fileId) return null;
@@ -1569,8 +1598,17 @@ async function renderConcertAttachmentsSection(concertId) {
   box.appendChild(progTitle);
 
   const progRow = document.createElement('div');
-  progRow.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;';
+  progRow.style.cssText = 'display:flex; gap:8px; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap;';
   if (concert.program_file_id) {
+    const thumbWrap = document.createElement('div');
+    thumbWrap.style.cssText = 'width:112px; height:112px; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; display:flex; align-items:center; justify-content:center; overflow:hidden;';
+    const thumbImg = document.createElement('img');
+    thumbImg.style.cssText = 'width:100%; height:100%; object-fit:contain;';
+    thumbWrap.appendChild(thumbImg);
+    thumbWrap.addEventListener('click', () => openFileForViewing(concert.program_file_id));
+    getPdfThumbnailDataUrl(concert.program_file_id).then(url => { if (url) thumbImg.src = url; });
+    progRow.appendChild(thumbWrap);
+
     const viewBtn = document.createElement('button');
     viewBtn.type = 'button';
     viewBtn.textContent = t('btn_view_program');
@@ -3010,7 +3048,8 @@ syncHeaderBtn.addEventListener('click', async () => {
     alert(t('alert_need_sync_target'));
     return;
   }
-  await syncActiveDestination({ manual: true });
+  const didSync = await syncActiveDestination({ manual: true });
+  if (!didSync) alert(t('alert_active_sync_not_set'));
 });
 
 // ---- 自動同期の間隔設定 ----
@@ -3024,9 +3063,10 @@ function getActiveSyncKind() {
 }
 async function syncActiveDestination(options) {
   const kind = getActiveSyncKind();
-  if (kind === 'local' && syncHandle) return performSync(options);
-  if (kind === 'google-drive' && driveFileId) return performDriveSync(options);
-  if (kind === 'dropbox' && dropboxConnected) return performDropboxSync(options);
+  if (kind === 'local' && syncHandle) { await performSync(options); return true; }
+  if (kind === 'google-drive' && driveFileId) { await performDriveSync(options); return true; }
+  if (kind === 'dropbox' && dropboxConnected) { await performDropboxSync(options); return true; }
+  return false;
 }
 
 function getSyncIntervalMinutes() {
