@@ -820,7 +820,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.085'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.086'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1821,7 +1821,7 @@ async function renderConcertAttachmentsSection(concertId, container = resultsEl)
   box.appendChild(progTitle);
 
   const progRow = document.createElement('div');
-  progRow.style.cssText = 'display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:8px 4px 4px 4px; margin-bottom:8px;';
+  progRow.style.cssText = 'display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; padding:8px 4px 4px 4px; margin-bottom:8px;';
   const programFiles = concert.program_files || [];
   for (const prog of programFiles) {
     const thumbWrap = document.createElement('div');
@@ -1882,7 +1882,7 @@ async function renderConcertAttachmentsSection(concertId, container = resultsEl)
   box.appendChild(photoTitle);
 
   const photoGrid = document.createElement('div');
-  photoGrid.style.cssText = 'display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:8px 4px 4px 4px; margin-bottom:8px;';
+  photoGrid.style.cssText = 'display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; padding:8px 4px 4px 4px; margin-bottom:8px;';
   const photoFiles = concert.photo_files || [];
   for (const p of photoFiles) {
     const thumbWrap = document.createElement('div');
