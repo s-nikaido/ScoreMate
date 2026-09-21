@@ -280,10 +280,11 @@
     </div>
 
     <section id="view-register" class="view">
-      <label class="photo-input" id="photo-input-label">
+      <label class="photo-input" id="photo-input-label" style="position:relative; display:block;">
         <span id="photo-placeholder">写真を撮影 / アップロード</span>
         <img id="photo-preview" style="display:none">
         <input type="file" id="photo-file" accept="image/*,application/pdf" multiple>
+        <button type="button" id="photo-clear-btn" style="display:none; position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%; border:none; background:var(--text-muted); color:var(--surface); font-size:14px; line-height:1; cursor:pointer; z-index:2;">×</button>
       </label>
       <button type="button" id="correct-skew-btn" style="width:100%; margin-bottom:8px; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text); font-size:13px; cursor:pointer; display:none;">📐 傾き・歪みを補正する</button>
       <button type="button" id="ai-read-btn" style="width:100%; margin-bottom:6px; padding:9px; border:1px solid var(--accent); border-radius:var(--radius); background:none; color:var(--accent); font-size:13px; cursor:pointer;">AIで読み取る（曲名・作曲家・パート）</button>
@@ -538,7 +539,7 @@ const I18N = {
   ja: {
     menu_search: '検索', menu_register: '登録', menu_concerts: '演奏会', menu_composers: '作曲家',
     menu_parts: 'パート', menu_settings: '設定', menu_unused_files: '未使用ファイル', menu_sync_history: '同期履歴', menu_diagnostics: 'データ診断', menu_help: 'ヘルプ', menu_label_master: 'マスタ管理', menu_label_data: 'データ管理',
-    menu_export: 'エクスポート（バックアップ）', menu_full_export: '完全エクスポート', menu_import: 'インポート（復元）', alert_full_export_failed: '完全エクスポートに失敗しました：', concert_program_label: 'プログラム', concert_photos_label: '写真', btn_view_program: 'プログラムを見る', btn_add_program: 'プログラムを追加', btn_add_photos: '写真を追加', btn_remove: '削除', confirm_remove_program: 'プログラムを削除しますか？（ファイル本体は未使用ファイルに残ります）', confirm_replace_program: '既にあるプログラムを差し替えますか？（元のファイル本体は未使用ファイルに残ります）', confirm_remove_photo: 'この写真を削除しますか？（ファイル本体は未使用ファイルに残ります）', alert_program_save_failed: 'プログラムの保存に失敗しました：', alert_photo_save_failed: '写真の保存に失敗しました：', alert_some_photos_failed: '{count}枚の写真の保存に失敗しました。他の写真は保存されています。', photo_count_warning: '写真の枚数が多いと、同期に時間がかかる場合があります。', help_search_placeholder: 'ヘルプ内を検索', help_no_results: '一致する項目が見つかりませんでした', onboarding_next_btn: '次へ', onboarding_start_btn: '始める', onboarding_skip_btn: 'スキップ', onboarding_back_btn: '戻る', help_view_intro_btn: '使い方を見る（オンボーディング）', feedback_btn: '不具合報告・ご要望', feedback_subject: '不具合報告・ご要望', feedback_body_placeholder: '（ここに内容をご記入ください）', feedback_version_label: 'バージョン', feedback_ua_label: 'ブラウザ情報', undo_deleted_message: '楽譜を削除しました', undo_btn: '元に戻す', register_from_unused_btn: '楽譜として登録', unused_file_attached_hint: 'このファイルを使って登録します（変更する場合のみ選び直してください）', btn_add_video: '動画を追加', confirm_remove_video: '動画リンクを削除しますか？', youtube_url_prompt: 'YouTubeのURLを入力してください', alert_invalid_youtube_url: 'YouTubeのURLとして認識できませんでした', btn_play_all: '▶ 全曲を順番に再生',
+    menu_export: 'エクスポート（バックアップ）', menu_full_export: '完全エクスポート', menu_import: 'インポート（復元）', alert_full_export_failed: '完全エクスポートに失敗しました：', concert_program_label: 'プログラム', concert_photos_label: '写真', btn_view_program: 'プログラムを見る', btn_add_program: 'プログラムを追加', btn_add_photos: '写真を追加', btn_remove: '削除', confirm_remove_program: 'プログラムを削除しますか？（ファイル本体は未使用ファイルに残ります）', confirm_replace_program: '既にあるプログラムを差し替えますか？（元のファイル本体は未使用ファイルに残ります）', btn_manage_attachments: '写真・プログラム', concert_memo_placeholder: 'メモ（会場・客演指揮者など）', confirm_remove_photo: 'この写真を削除しますか？（ファイル本体は未使用ファイルに残ります）', alert_program_save_failed: 'プログラムの保存に失敗しました：', alert_photo_save_failed: '写真の保存に失敗しました：', alert_some_photos_failed: '{count}枚の写真の保存に失敗しました。他の写真は保存されています。', photo_count_warning: '写真の枚数が多いと、同期に時間がかかる場合があります。', help_search_placeholder: 'ヘルプ内を検索', help_no_results: '一致する項目が見つかりませんでした', onboarding_next_btn: '次へ', onboarding_start_btn: '始める', onboarding_skip_btn: 'スキップ', onboarding_back_btn: '戻る', help_view_intro_btn: '使い方を見る（オンボーディング）', feedback_btn: '不具合報告・ご要望', feedback_subject: '不具合報告・ご要望', feedback_body_placeholder: '（ここに内容をご記入ください）', feedback_version_label: 'バージョン', feedback_ua_label: 'ブラウザ情報', undo_deleted_message: '楽譜を削除しました', undo_btn: '元に戻す', register_from_unused_btn: '楽譜として登録', unused_file_attached_hint: 'このファイルを使って登録します（変更する場合のみ選び直してください）', btn_add_video: '動画を追加', confirm_remove_video: '動画リンクを削除しますか？', youtube_url_prompt: 'YouTubeのURLを入力してください', alert_invalid_youtube_url: 'YouTubeのURLとして認識できませんでした', btn_play_all: '▶ 全曲を順番に再生',
     search_placeholder: '検索',
     filter_title: '曲名', filter_concert: '演奏会', filter_part: 'パート', filter_composer: '作曲家',
     label_title: '曲名 *', label_composer: '作曲家', label_part: 'パート名', label_memo: 'メモ',
@@ -656,7 +657,7 @@ const I18N = {
   en: {
     menu_search: 'Search', menu_register: 'Add', menu_concerts: 'Concerts', menu_composers: 'Composers',
     menu_parts: 'Parts', menu_settings: 'Settings', menu_unused_files: 'Unused Files', menu_sync_history: 'Sync History', menu_diagnostics: 'Diagnostics', menu_help: 'Help', menu_label_master: 'Master Data', menu_label_data: 'Data Management',
-    menu_export: 'Export (Backup)', menu_full_export: 'Full Export', menu_import: 'Import (Restore)', alert_full_export_failed: 'Full export failed: ', concert_program_label: 'Program', concert_photos_label: 'Photos', btn_view_program: 'View Program', btn_add_program: 'Add Program', btn_add_photos: 'Add Photos', btn_remove: 'Remove', confirm_remove_program: 'Remove the program? (The file itself stays in Unused Files.)', confirm_replace_program: 'Replace the existing program? (The original file stays in Unused Files.)', confirm_remove_photo: 'Remove this photo? (The file itself stays in Unused Files.)', alert_program_save_failed: 'Failed to save program: ', alert_photo_save_failed: 'Failed to save photo: ', alert_some_photos_failed: '{count} photo(s) failed to save. The others were saved successfully.', photo_count_warning: 'A large number of photos may slow down syncing.', help_search_placeholder: 'Search help', help_no_results: 'No matching topics found', onboarding_next_btn: 'Next', onboarding_start_btn: 'Get Started', onboarding_skip_btn: 'Skip', onboarding_back_btn: 'Back', help_view_intro_btn: 'View Intro', feedback_btn: 'Report a Bug / Suggest a Feature', feedback_subject: 'Bug Report / Feature Request', feedback_body_placeholder: '(Please describe your feedback here)', feedback_version_label: 'Version', feedback_ua_label: 'Browser Info', undo_deleted_message: 'Score deleted', undo_btn: 'Undo', register_from_unused_btn: 'Register as a Score', unused_file_attached_hint: 'This file will be used (re-select only if you want to change it)', btn_add_video: 'Add Video', confirm_remove_video: 'Remove this video link?', youtube_url_prompt: 'Enter a YouTube URL', alert_invalid_youtube_url: 'Could not recognize this as a YouTube URL', btn_play_all: '▶ Play All in Order',
+    menu_export: 'Export (Backup)', menu_full_export: 'Full Export', menu_import: 'Import (Restore)', alert_full_export_failed: 'Full export failed: ', concert_program_label: 'Program', concert_photos_label: 'Photos', btn_view_program: 'View Program', btn_add_program: 'Add Program', btn_add_photos: 'Add Photos', btn_remove: 'Remove', confirm_remove_program: 'Remove the program? (The file itself stays in Unused Files.)', confirm_replace_program: 'Replace the existing program? (The original file stays in Unused Files.)', btn_manage_attachments: 'Photos/Program', concert_memo_placeholder: 'Notes (venue, guest conductor, etc.)', confirm_remove_photo: 'Remove this photo? (The file itself stays in Unused Files.)', alert_program_save_failed: 'Failed to save program: ', alert_photo_save_failed: 'Failed to save photo: ', alert_some_photos_failed: '{count} photo(s) failed to save. The others were saved successfully.', photo_count_warning: 'A large number of photos may slow down syncing.', help_search_placeholder: 'Search help', help_no_results: 'No matching topics found', onboarding_next_btn: 'Next', onboarding_start_btn: 'Get Started', onboarding_skip_btn: 'Skip', onboarding_back_btn: 'Back', help_view_intro_btn: 'View Intro', feedback_btn: 'Report a Bug / Suggest a Feature', feedback_subject: 'Bug Report / Feature Request', feedback_body_placeholder: '(Please describe your feedback here)', feedback_version_label: 'Version', feedback_ua_label: 'Browser Info', undo_deleted_message: 'Score deleted', undo_btn: 'Undo', register_from_unused_btn: 'Register as a Score', unused_file_attached_hint: 'This file will be used (re-select only if you want to change it)', btn_add_video: 'Add Video', confirm_remove_video: 'Remove this video link?', youtube_url_prompt: 'Enter a YouTube URL', alert_invalid_youtube_url: 'Could not recognize this as a YouTube URL', btn_play_all: '▶ Play All in Order',
     search_placeholder: 'Search',
     filter_title: 'Title', filter_concert: 'Concert', filter_part: 'Part', filter_composer: 'Composer',
     label_title: 'Title *', label_composer: 'Composer', label_part: 'Part', label_memo: 'Notes',
@@ -823,7 +824,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.066'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.069'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1146,11 +1147,12 @@ async function addOrGetConcert({ name, date }) {
   markChanged('concerts', concert.id);
   return concert;
 }
-async function updateConcert(id, { name, date }) {
+async function updateConcert(id, { name, date, memo }) {
   const concert = db.concerts.find(c => c.id === id);
   if (!concert) return;
   concert.name = name.trim();
   concert.concert_date = date || null;
+  concert.memo = (memo || '').trim();
   await idbPut('concerts', concert);
   markChanged('concerts', id);
 }
@@ -1185,6 +1187,19 @@ async function mergePartInto(sourceId, targetId) {
   }
   await partMaster.remove(sourceId);
 }
+// 曲（work）の統合：あとから登録した楽譜を既存の曲と同じ扱いにする
+async function mergeWorkInto(sourceId, targetId) {
+  const affected = db.scores.filter(s => s.work_id === sourceId);
+  for (const s of affected) {
+    s.work_id = targetId;
+    await idbPut('scores', s);
+    markChanged('scores', s.id);
+  }
+  await idbDelete('works', sourceId);
+  db.works = db.works.filter(w => w.id !== sourceId);
+  markDeleted('works', sourceId);
+}
+
 async function mergeConcertInto(sourceId, targetId) {
   const affected = db.performances.filter(p => p.concert_id === sourceId);
   for (const p of affected) {
@@ -1196,6 +1211,9 @@ async function mergeConcertInto(sourceId, targetId) {
   const source = db.concerts.find(c => c.id === sourceId);
   const target = db.concerts.find(c => c.id === targetId);
   if (source && target) {
+    if (source.memo && !target.memo) {
+      target.memo = source.memo;
+    }
     if (source.program_files && source.program_files.length > 0) {
       const existingProgramIds = new Set((target.program_files || []).map(p => p.id));
       target.program_files = [...(target.program_files || []), ...source.program_files.filter(p => !existingProgramIds.has(p.id))];
@@ -1419,6 +1437,35 @@ function matches(work, scores, query) {
   return (work.title || '').toLowerCase().includes(query.toLowerCase());
 }
 
+// 曲カードの見出し内に、統合先を選ぶミニパネルを表示する
+function startMergeWork(work, card, header) {
+  const existing = card.querySelector('.work-merge-panel');
+  if (existing) { existing.remove(); return; }
+  const others = db.works.filter(w => w.id !== work.id).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+  if (others.length === 0) { alert(t('merge_no_others')); return; }
+  const panel = document.createElement('div');
+  panel.className = 'work-merge-panel';
+  panel.style.cssText = 'display:flex; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--border);';
+  panel.innerHTML = `
+    <span style="flex-shrink:0; font-size:13px;">${escapeHtml(work.title)} →</span>
+    <select style="flex:1;">${others.map(o => `<option value="${o.id}">${escapeHtml(o.title)} / ${escapeHtml(composerMaster.byId(o.composer_id)?.name || t('unset_composer'))}</option>`).join('')}</select>
+    <button type="button" class="execute">${t('btn_execute')}</button>
+    <button type="button" class="cancel">${t('btn_cancel')}</button>
+  `;
+  const select = panel.querySelector('select');
+  panel.querySelector('.execute').addEventListener('click', async () => {
+    const targetId = select.value;
+    const target = others.find(o => o.id === targetId);
+    const count = scoresForWork(work.id).length;
+    if (!confirm(tf('confirm_merge', { source: work.title, target: target.title, count }))) return;
+    await mergeWorkInto(work.id, targetId);
+    renderResults();
+    scheduleSync();
+  });
+  panel.querySelector('.cancel').addEventListener('click', () => panel.remove());
+  header.insertAdjacentElement('afterend', panel);
+}
+
 async function appendWorkCards(filteredList, container = resultsEl, options = {}) {
   for (const { work, scores } of filteredList) {
     const card = document.createElement('div');
@@ -1438,9 +1485,16 @@ async function appendWorkCards(filteredList, container = resultsEl, options = {}
       <div style="display:flex; align-items:center; gap:6px;">
         ${options.concertId ? `<button type="button" class="video-btn" style="background:none; border:1px solid var(--border); border-radius:var(--radius); color:${videoUrl ? 'var(--accent)' : 'var(--text-muted)'}; font-size:13px; padding:4px 8px; cursor:pointer;">${videoUrl ? '▶' : t('btn_add_video')}</button>` : ''}
         ${options.concertId && videoUrl ? `<button type="button" class="video-clear-btn" style="background:none; border:none; color:var(--text-muted); font-size:13px; padding:4px; cursor:pointer;">×</button>` : ''}
+        ${options.mergeable ? `<button type="button" class="work-merge-btn" style="background:none; border:1px solid var(--border); border-radius:var(--radius); color:var(--text-secondary); font-size:12px; padding:4px 8px; cursor:pointer;">${t('btn_merge')}</button>` : ''}
         <span class="count">${scores.length}件</span>
       </div>
     `;
+    if (options.mergeable) {
+      header.querySelector('.work-merge-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        startMergeWork(work, card, header);
+      });
+    }
     if (options.concertId && videoUrl) {
       header.querySelector('.video-clear-btn').addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1720,7 +1774,7 @@ async function openFileForViewing(fileId) {
 }
 const PHOTO_COUNT_WARNING_THRESHOLD = 20;
 
-async function renderConcertAttachmentsSection(concertId) {
+async function renderConcertAttachmentsSection(concertId, container = resultsEl) {
   const concert = concertById(concertId);
   if (!concert) return;
   const box = document.createElement('div');
@@ -1848,7 +1902,7 @@ async function renderConcertAttachmentsSection(concertId) {
   box.appendChild(addPhotosBtn);
   box.appendChild(photosInput);
 
-  resultsEl.appendChild(box);
+  container.appendChild(box);
 }
 
 async function renderConcertProgramList(query = '') {
@@ -1934,7 +1988,7 @@ async function renderResults() {
   const filtered = db.works.map(w => ({ work: w, scores: scoresForWork(w.id) })).filter(({ work, scores }) => matches(work, scores, query));
   if (filtered.length === 0) { resultsEl.innerHTML = `<div class="empty">${t('empty_no_scores')}</div>`; return; }
   filtered.sort((a, b) => a.work.title.localeCompare(b.work.title, 'ja'));
-  if (!isGroupingEnabled()) { await appendWorkCards(filtered); return; }
+  if (!isGroupingEnabled()) { await appendWorkCards(filtered, resultsEl, { mergeable: true }); return; }
   const groups = new Map();
   for (const item of filtered) {
     const key = (item.work.title.trim()[0] || '').toUpperCase();
@@ -1943,7 +1997,7 @@ async function renderResults() {
   }
   for (const [key, list] of groups) {
     const body = createCollapsibleGroup(key, list.length + '件');
-    await appendWorkCards(list, body);
+    await appendWorkCards(list, body, { mergeable: true });
   }
 }
 
@@ -2071,6 +2125,7 @@ function startEditScore(scoreId) {
   existingImageFileId = score.image_file_id || null;
   existingImageType = score.image_type || null;
   existingImageFileName = score.image_file_name || null;
+  document.getElementById('photo-clear-btn').style.display = score.image_file_id ? 'flex' : 'none';
   if (score.image_file_id) {
     getFileUrl(score.image_file_id).then(url => {
       if (currentPreviewLocalUrl) { URL.revokeObjectURL(currentPreviewLocalUrl); currentPreviewLocalUrl = null; }
@@ -2113,6 +2168,7 @@ function startRegisterFromUnusedFile(rec) {
   existingImageFileId = rec.id;
   existingImageType = rec.type;
   existingImageFileName = rec.fileName || null;
+  document.getElementById('photo-clear-btn').style.display = 'flex';
   getFileUrl(rec.id).then(url => {
     if (currentPreviewLocalUrl) { URL.revokeObjectURL(currentPreviewLocalUrl); currentPreviewLocalUrl = null; }
     if (isPdfType(rec.type)) {
@@ -2161,11 +2217,28 @@ let existingImageFileName = null;
 
 function isPdf(file) { return file && file.type === 'application/pdf'; }
 
+document.getElementById('photo-clear-btn').addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (currentPreviewLocalUrl) { URL.revokeObjectURL(currentPreviewLocalUrl); currentPreviewLocalUrl = null; }
+  selectedFiles = [];
+  existingImageFileId = null;
+  existingImageType = null;
+  existingImageFileName = null;
+  photoFile.value = '';
+  photoPreview.style.display = 'none';
+  photoPreview.src = '';
+  photoPlaceholder.style.display = 'block';
+  photoPlaceholder.textContent = t('photo_placeholder');
+  updateCorrectSkewBtnVisibility();
+  document.getElementById('photo-clear-btn').style.display = 'none';
+});
 photoFile.addEventListener('change', () => {
   const files = Array.from(photoFile.files);
   if (files.length === 0) return;
   selectedFiles = files;
   updateCorrectSkewBtnVisibility();
+  document.getElementById('photo-clear-btn').style.display = 'flex';
   if (files.length > 1) {
     photoPreview.style.display = 'none';
     photoPlaceholder.style.display = 'block';
@@ -2589,6 +2662,7 @@ function resetForm() {
   existingImageType = null;
   existingImageFileName = null;
   photoFile.value = '';
+  document.getElementById('photo-clear-btn').style.display = 'none';
   updateCorrectSkewBtnVisibility();
   partError.style.display = 'none';
   titleError.style.display = 'none';
@@ -2755,10 +2829,19 @@ function renderConcertMasterList() {
   sorted.forEach(c => {
     const row = document.createElement('div');
     row.className = 'concert-row';
+    row.dataset.concertId = c.id;
     row.innerHTML = `
-      <span>${escapeHtml(c.name)}${c.concert_date ? `<span class="date">${escapeHtml(c.concert_date)}</span>` : ''}<span class="count">${tf('used_count_suffix', { count: performanceCountForConcert(c.id) })}</span></span>
-      <div class="actions"><button type="button" class="merge">${t('btn_merge')}</button><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
+      <span>${escapeHtml(c.name)}${c.concert_date ? `<span class="date">${escapeHtml(c.concert_date)}</span>` : ''}<span class="count">${tf('used_count_suffix', { count: performanceCountForConcert(c.id) })}</span>${c.memo ? `<span class="sub" style="display:block; font-size:12px; color:var(--text-muted); margin-top:2px;">${escapeHtml(c.memo)}</span>` : ''}</span>
+      <div class="actions"><button type="button" class="attachments">${t('btn_manage_attachments')}</button><button type="button" class="merge">${t('btn_merge')}</button><button type="button" class="edit">${t('btn_edit')}</button><button type="button" class="delete">${t('btn_delete')}</button></div>
     `;
+    const attachmentsBox = document.createElement('div');
+    attachmentsBox.style.cssText = 'display:none; padding:10px 0 4px;';
+    row.querySelector('.attachments').addEventListener('click', async () => {
+      const isOpen = attachmentsBox.style.display !== 'none';
+      if (isOpen) { attachmentsBox.style.display = 'none'; attachmentsBox.innerHTML = ''; return; }
+      attachmentsBox.style.display = 'block';
+      await renderConcertAttachmentsSection(c.id, attachmentsBox);
+    });
     row.querySelector('.merge').addEventListener('click', () => {
       const others = db.concerts.filter(x => x.id !== c.id).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
       if (others.length === 0) { alert(t('merge_no_others')); return; }
@@ -2790,21 +2873,25 @@ function renderConcertMasterList() {
       if (confirm(msg)) { deleteConcert(c.id).then(() => { renderConcertMasterList(); renderResults(); scheduleSync(); }); }
     });
     concertMasterListEl.appendChild(row);
+    concertMasterListEl.appendChild(attachmentsBox);
   });
 }
 function startEditConcert(concertId) {
   const concert = db.concerts.find(c => c.id === concertId);
   if (!concert) return;
-  const target = [...concertMasterListEl.children][db.concerts.slice().sort((a, b) => (b.concert_date || '').localeCompare(a.concert_date || '')).findIndex(c => c.id === concertId)];
+  const target = concertMasterListEl.querySelector(`[data-concert-id="${concertId}"]`);
+  if (!target) return;
   target.className = 'concert-row editing';
   target.innerHTML = `
     <div class="edit-fields"><input type="text" value="${escapeHtml(concert.name)}" style="flex:2;"><input type="date" value="${concert.concert_date || ''}" style="flex:1;"></div>
+    <textarea class="concert-memo-input" placeholder="${t('concert_memo_placeholder')}" style="width:100%; margin-top:6px; box-sizing:border-box; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; resize:vertical;" rows="2">${escapeHtml(concert.memo || '')}</textarea>
     <div class="actions" style="justify-content:flex-end;"><button type="button" class="save">${t('btn_save')}</button><button type="button" class="cancel">${t('btn_cancel')}</button></div>
   `;
   const [nameInput, dateInput] = target.querySelectorAll('input');
+  const memoInput = target.querySelector('.concert-memo-input');
   target.querySelector('.save').addEventListener('click', async () => {
     if (!nameInput.value.trim()) { nameInput.focus(); return; }
-    await updateConcert(concertId, { name: nameInput.value, date: dateInput.value });
+    await updateConcert(concertId, { name: nameInput.value, date: dateInput.value, memo: memoInput.value });
     renderConcertMasterList();
     renderResults();
     scheduleSync();
@@ -4734,7 +4821,7 @@ const HELP_TOPICS = {
     { id: 'sync-how', title: '同期の仕組み（重要）', body: '複数端末で同期する場合、それぞれの端末で「変更した内容」だけをクラウド側の最新内容に重ねる方式です。通常の利用（別々の端末で別々の楽譜を登録するなど）では問題なく両方の変更が反映されます。ただし、<b>ごく短い時間内に複数端末でまったく同時に同期処理が走った場合や、同じデータを両端末でほぼ同時に編集した場合</b>は、片方の変更が失われる可能性があります。これは完全な排他制御を行っていないためで、確率的にはまれですが、ゼロではありません。また、同期のたびに、参照されなくなったファイルは自動的に整理されます（詳しくは<a href="#" class="help-jump" data-topic="unused">未使用ファイルについて</a>）。万が一データが消えてしまった場合は<a href="#" class="help-jump" data-topic="data-missing">こちら</a>をご覧ください。' },
     { id: 'data-missing', title: '万が一データが消えてしまったら', body: 'メニューの「同期履歴」から、同期のたびに自動保存された過去の状態（最新20件）を確認し、復元できます。復元は「その時点の内容に戻す」動作で、現在のデータは置き換わります。同期を設定していない場合は、この履歴も作成されませんので、メニューの「エクスポート（バックアップ）」を使って定期的に手動バックアップを取ることをおすすめします（<a href="#" class="help-jump" data-topic="sync-how">同期の仕組み</a>もあわせてご確認ください）。' },
     { id: 'unused', title: '未使用ファイルについて', body: '楽譜を削除しても、添付されていた画像・PDF本体はすぐには削除されません（誤削除からの復旧のため）。削除直後は画面下に「元に戻す」が数秒間表示され、押せば曲名等も含めてそのまま復活します。時間が経ってから気づいた場合は、メニューの「未使用ファイル」から、そのファイルを「楽譜として登録」し直すこともできます（この場合、曲名等は入力し直しが必要です）。使われなくなったファイルは、この画面から必要に応じて削除できます。同期のたびにこの整理が自動的に行われます（<a href="#" class="help-jump" data-topic="sync-how">同期の仕組み</a>）。' },
-    { id: 'merge', title: 'マスタの統合', body: '「演奏会」「作曲家」「パート」の画面で、同じものを違う表記で登録してしまった場合、各項目の「統合」ボタンからまとめることができます。統合すると、その表記を使っていた楽譜・楽曲は自動的に統合先に付け替えられます。' },
+    { id: 'merge', title: 'マスタの統合', body: '「演奏会」「作曲家」「パート」の画面で、同じものを違う表記で登録してしまった場合、各項目の「統合」ボタンからまとめることができます。統合すると、その表記を使っていた楽譜・楽曲は自動的に統合先に付け替えられます。検索画面の「曲名」タブでも、同じ曲を後から別々に登録してしまった場合、各曲のカードにある「統合」ボタンからまとめられます。' },
     { id: 'ai', title: 'AI読み取りについて（任意機能）', body: '「設定」画面でGemini APIキーを登録すると、登録画面で写真から曲名・作曲家・パートを自動読み取りできます。無料枠のAPIキーを使う場合、送信した画像がGoogle側の品質改善に使われることがあります。気になる場合は使わないか、有料キーをご利用ください。すでに入力済みの項目は上書きされません。' },
     { id: 'diagnostics', title: 'データ診断', body: 'メニューの「データ診断」から、存在しない項目への参照など、データの矛盾がないか確認・修復できます。通常は問題ありません。' },
     { id: 'feedback', title: '不具合報告・ご要望', body: '「設定」画面の一番下から、不具合報告やご要望をお送りいただけます。タップすると、バージョン番号・ブラウザ情報を自動で添えたメール下書きが開きます。' },
@@ -4749,7 +4836,7 @@ const HELP_TOPICS = {
     { id: 'sync-how', title: 'How Sync Works (Important)', body: 'When syncing across devices, each device overlays only what it changed onto the latest cloud content. This works fine for normal use. However, if two devices sync at the exact same moment, or edit the same data at nearly the same time, one change could be lost. This is because sync is not fully exclusive by design. It\'s rare, but not impossible. Every sync also automatically tidies up files that are no longer referenced — see <a href="#" class="help-jump" data-topic="unused">About Unused Files</a>. If data ever goes missing, see <a href="#" class="help-jump" data-topic="data-missing">here</a>.' },
     { id: 'data-missing', title: 'If Data Ever Goes Missing', body: 'Check "Sync History" in the menu — a snapshot is saved automatically before every sync (latest 20 kept), and you can restore from there. Restoring replaces your current data with that snapshot. If sync isn\'t set up, no history is created, so use "Export (Backup)" periodically for manual backups. See also <a href="#" class="help-jump" data-topic="sync-how">How Sync Works</a>.' },
     { id: 'unused', title: 'About Unused Files', body: 'When you delete a score, the attached image/PDF isn\'t deleted right away (to allow recovery from accidental deletion). Right after deleting, an "Undo" option appears at the bottom of the screen for a few seconds — tap it to bring the score back with its title, etc. intact. If you notice a leftover file later, check "Unused Files" in the menu, where you can "Register as a Score" to reuse it (you\'ll need to re-enter the title and other details), or delete files that are no longer needed. This cleanup happens automatically on every sync — see <a href="#" class="help-jump" data-topic="sync-how">How Sync Works</a>.' },
-    { id: 'merge', title: 'Merging Master Records', body: 'If you registered the same concert, composer, or part under different spellings, use the "Merge" button on each item to combine them. Any scores or works using that entry are automatically re-linked.' },
+    { id: 'merge', title: 'Merging Master Records', body: 'If you registered the same concert, composer, or part under different spellings, use the "Merge" button on each item to combine them. Any scores or works using that entry are automatically re-linked. On the "Title" tab of Search, each work card also has a "Merge" button, for when the same piece ends up registered separately.' },
     { id: 'ai', title: 'AI Reading (Optional)', body: 'Register a Gemini API key in Settings to automatically read the title, composer, and part from a photo. Free-tier keys may have images used by Google to improve its products. Fields already filled in won\'t be overwritten.' },
     { id: 'diagnostics', title: 'Data Diagnostics', body: 'Use "Data Diagnostics" in the menu to check for and fix data inconsistencies, such as references to missing items. Usually there\'s nothing to worry about.' },
     { id: 'feedback', title: 'Report a Bug / Suggest a Feature', body: 'From the bottom of the "Settings" screen, you can report a bug or send a feature request. Tapping it opens a pre-filled email draft with the app version and browser info automatically included.' },
