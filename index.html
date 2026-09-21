@@ -272,7 +272,7 @@
       <span id="undo-snackbar-msg" style="font-size:13px;"></span>
       <button type="button" id="undo-snackbar-btn" style="background:none; border:none; color:#F0C99B; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap;"></button>
     </div>
-    <div id="export-bar" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:60; background:var(--surface); border-top:1px solid var(--border); padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px)); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+    <div id="export-bar" style="display:none; position:fixed; left:0; right:0; bottom:0; z-index:60; background:var(--surface); border-top:1px solid var(--border); padding:10px 16px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px)); align-items:center; justify-content:space-between; gap:10px;">
       <span id="export-bar-count" style="font-size:13px; color:var(--text-secondary);"></span>
       <div style="display:flex; gap:8px;">
         <button type="button" id="export-bar-clear-btn" style="padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); background:none; color:var(--text-secondary); font-size:13px; cursor:pointer;">選択解除</button>
@@ -823,7 +823,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '1.0.0'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
+const APP_VERSION = '1.0.1'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
