@@ -150,6 +150,8 @@
   .work-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
   .work-card { -webkit-user-select: none; -moz-user-select: none; user-select: none; }
   .work-card-dragging, .work-card.sortable-fallback { opacity: 0.6 !important; box-shadow: 0 4px 14px rgba(58,46,31,0.28); border: 2px solid var(--accent) !important; background: var(--surface) !important; }
+  #yt-player-frame:fullscreen, #yt-player-frame:-webkit-full-screen { width: 100vw !important; height: 100vh !important; background: #000; display: flex; align-items: center; justify-content: center; }
+  #yt-player-frame:fullscreen iframe, #yt-player-frame:-webkit-full-screen iframe { width: 100% !important; height: 100% !important; }
   .work-card .work-header { padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 8px; }
   .work-header .title { font-family: var(--font-serif); font-size: 16px; font-weight: 400; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .work-header .sub { font-size: 12px; color: var(--text-secondary); margin: 3px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -264,6 +266,7 @@
         <div style="display:flex; gap:10px; margin-top:4px;">
           <button type="button" id="player-bar-prev" style="background:none; border:none; color:var(--text-secondary); font-size:16px; cursor:pointer; padding:2px 6px;">⏮</button>
           <button type="button" id="player-bar-next" style="background:none; border:none; color:var(--text-secondary); font-size:16px; cursor:pointer; padding:2px 6px;">⏭</button>
+          <button type="button" id="player-bar-fullscreen" title="全画面表示" style="background:none; border:none; color:var(--text-secondary); font-size:16px; cursor:pointer; padding:2px 6px;">⛶</button>
         </div>
       </div>
       <button type="button" id="player-bar-close" style="background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:4px 8px; align-self:flex-start;">×</button>
@@ -823,7 +826,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '1.0.3'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
+const APP_VERSION = '1.1.0'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1101,8 +1104,7 @@ function hidePlayerBar() {
   playQueue = [];
   playQueueIndex = -1;
 }
-function playSingleVideo(videoId, title) { playQueue = [{ videoId, title }]; startPlayerAt(0); }
-function playQueueFromList(items) { playQueue = items; startPlayerAt(0); }
+function playQueueFromList(items, startIndex = 0) { playQueue = items; startPlayerAt(startIndex); }
 document.getElementById('player-bar-next').addEventListener('click', () => {
   if (playQueueIndex + 1 < playQueue.length) startPlayerAt(playQueueIndex + 1);
 });
@@ -1110,6 +1112,16 @@ document.getElementById('player-bar-prev').addEventListener('click', () => {
   if (playQueueIndex - 1 >= 0) startPlayerAt(playQueueIndex - 1);
 });
 document.getElementById('player-bar-close').addEventListener('click', hidePlayerBar);
+document.getElementById('player-bar-fullscreen').addEventListener('click', () => {
+  const frame = document.getElementById('yt-player-frame');
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  } else if (frame.requestFullscreen) {
+    frame.requestFullscreen();
+  } else if (frame.webkitRequestFullscreen) {
+    frame.webkitRequestFullscreen();
+  }
+});
 
 async function deleteScore(scoreId) {
   const score = db.scores.find(s => s.id === scoreId);
@@ -1521,6 +1533,14 @@ function attachMergeSortable(container) {
 }
 
 async function appendWorkCards(filteredList, container = resultsEl, options = {}) {
+  // この画面内で動画リンクが付いている曲一覧（単曲再生時も「次へ/前へ」で移動できるようにする）
+  const videoQueueItems = options.concertId
+    ? filteredList
+        .map(({ work }) => ({ work, url: getWorkVideoUrl(work.id, options.concertId) }))
+        .filter(({ url }) => url)
+        .map(({ work, url }) => ({ videoId: extractYoutubeId(url), title: work.title }))
+        .filter(item => item.videoId)
+    : [];
   for (const { work, scores } of filteredList) {
     const card = document.createElement('div');
     card.className = 'work-card';
@@ -1562,7 +1582,10 @@ async function appendWorkCards(filteredList, container = resultsEl, options = {}
         const current = getWorkVideoUrl(work.id, options.concertId);
         if (current) {
           const videoId = extractYoutubeId(current);
-          if (videoId) playSingleVideo(videoId, work.title);
+          if (videoId) {
+            const idx = videoQueueItems.findIndex(it => it.videoId === videoId);
+            playQueueFromList(videoQueueItems, idx >= 0 ? idx : 0);
+          }
           return;
         }
         openWorkVideoInputPanel(work, card, header, options.concertId);
@@ -2098,6 +2121,13 @@ function renderPerformanceList(scoreId) {
     const performances = performancesForScore(scoreId);
     const editingScore = db.scores.find(s => s.id === scoreId);
     const editingWork = editingScore ? db.works.find(w => w.id === editingScore.work_id) : null;
+    const perfVideoQueueItems = editingWork
+      ? performances
+          .map(p => ({ p, url: getWorkVideoUrl(editingWork.id, p.concert_id) }))
+          .filter(({ url }) => url)
+          .map(({ p, url }) => ({ videoId: extractYoutubeId(url), title: `${editingWork.title}（${concertById(p.concert_id)?.name || ''}）` }))
+          .filter(item => item.videoId)
+      : [];
     if (performances.length === 0) {
       performanceListEl.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">まだ演奏会が登録されていません</div>';
       return;
@@ -2122,7 +2152,10 @@ function renderPerformanceList(scoreId) {
         item.querySelector('.perf-video-btn').addEventListener('click', () => {
           if (videoUrl) {
             const videoId = extractYoutubeId(videoUrl);
-            if (videoId) playSingleVideo(videoId, work.title);
+            if (videoId) {
+              const idx = perfVideoQueueItems.findIndex(it => it.videoId === videoId);
+              playQueueFromList(perfVideoQueueItems, idx >= 0 ? idx : 0);
+            }
             return;
           }
           openWorkVideoInputPanel(work, item, item, p.concert_id, () => renderPerformanceList(scoreId));
