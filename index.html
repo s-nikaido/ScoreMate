@@ -826,7 +826,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.083'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.084'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1532,13 +1532,13 @@ async function appendWorkCards(filteredList, container = resultsEl, options = {}
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; white-space:nowrap;">
-        ${options.dragHandle ? `<span class="drag-handle" style="cursor:grab; color:var(--text-muted); padding:4px; touch-action:none; flex-shrink:0;">⠿</span>` : ''}
         ${options.concertId ? `
           <span style="position:relative; display:inline-block; flex-shrink:0;">
             <button type="button" class="video-btn" style="background:none; border:1px solid var(--border); border-radius:var(--radius); color:${videoUrl ? 'var(--accent)' : 'var(--text-muted)'}; font-size:13px; padding:4px 8px; cursor:pointer; white-space:nowrap;">${videoUrl ? '▶' : t('btn_add_video')}</button>
             ${videoUrl ? `<button type="button" class="video-clear-btn" title="${t('btn_remove')}" style="position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; border:none; background:var(--text-muted); color:var(--surface); font-size:10px; line-height:1; cursor:pointer; padding:0;">×</button>` : ''}
           </span>
         ` : ''}
+        ${options.dragHandle ? `<span class="drag-handle" style="cursor:grab; color:var(--text-muted); padding:4px; touch-action:none; flex-shrink:0;">⠿</span>` : ''}
         ${options.mergeable ? `<span class="merge-drag-handle" title="${t('merge_drag_hint')}" style="cursor:grab; color:var(--text-muted); padding:4px; touch-action:none; flex-shrink:0;">⠿</span>` : ''}
       </div>
     `;
