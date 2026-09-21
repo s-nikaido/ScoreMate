@@ -808,7 +808,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.050'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.051'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -3309,7 +3309,7 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
       const remoteData = text.trim() ? JSON.parse(text) : {};
       // クラウドの最新内容に、この端末の変更点だけを重ねて適用する
       await applyRemoteWithLocalOverlay(remoteData);
-      await importMissingLocalFiles({ scores: db.scores });
+      await importMissingLocalFiles({ scores: db.scores, concerts: db.concerts });
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileLocalFileLocations();
@@ -3801,7 +3801,7 @@ async function performDriveSync({ forceWrite = false, manual = false } = {}) {
       const remoteData = text.trim() ? JSON.parse(text) : {};
       // クラウドの最新内容に、この端末の変更点だけを重ねて適用する
       await applyRemoteWithLocalOverlay(remoteData);
-      await importMissingDriveFiles({ scores: db.scores });
+      await importMissingDriveFiles({ scores: db.scores, concerts: db.concerts });
       if (!hasAnyPendingChanges()) {
         // この端末に変更が無ければ、取り込むだけで終わる（書き戻し不要）
         await reconcileDriveFileLocations();
@@ -4155,7 +4155,7 @@ async function performDropboxSync({ forceWrite = false, manual = false } = {}) {
       const text = res ? await res.text() : '';
       const remoteData = text.trim() ? JSON.parse(text) : {};
       await applyRemoteWithLocalOverlay(remoteData);
-      await importMissingDropboxFiles({ scores: db.scores });
+      await importMissingDropboxFiles({ scores: db.scores, concerts: db.concerts });
       if (!hasAnyPendingChanges()) {
         await reconcileDropboxFileLocations();
         await dropboxUpload('/index.csv', '\uFEFF' + buildFullExportIndexCsv()).catch(err => console.error('dropbox sync csv write failed', err));
