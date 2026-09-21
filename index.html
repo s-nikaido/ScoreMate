@@ -812,7 +812,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.059'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.060'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1659,11 +1659,11 @@ async function renderConcertAttachmentsSection(concertId) {
   box.appendChild(photoTitle);
 
   const photoGrid = document.createElement('div');
-  photoGrid.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;';
+  photoGrid.style.cssText = 'display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; margin-bottom:8px;';
   const photoFiles = concert.photo_files || [];
   for (const p of photoFiles) {
     const thumbWrap = document.createElement('div');
-    thumbWrap.style.cssText = 'position:relative; width:92px; height:92px;';
+    thumbWrap.style.cssText = 'position:relative; width:92px; height:92px; flex-shrink:0;';
     const img = document.createElement('img');
     img.style.cssText = 'width:92px; height:92px; object-fit:contain; border-radius:6px; cursor:pointer; border:1px solid var(--border); background:var(--bg);';
     getFileUrl(p.id).then(url => { if (url) img.src = url; });
