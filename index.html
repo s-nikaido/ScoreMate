@@ -812,7 +812,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '2.062'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
+const APP_VERSION = '2.063'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1618,11 +1618,6 @@ async function renderConcertAttachmentsSection(concertId) {
     getPdfThumbnailDataUrl(concert.program_file_id).then(url => { if (url) thumbImg.src = url; });
     progRow.appendChild(thumbWrap);
 
-    const viewBtn = document.createElement('button');
-    viewBtn.type = 'button';
-    viewBtn.textContent = t('btn_view_program');
-    viewBtn.style.cssText = 'padding:7px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:12px; cursor:pointer;';
-    viewBtn.addEventListener('click', () => openFileForViewing(concert.program_file_id));
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.textContent = t('btn_remove');
@@ -1633,7 +1628,6 @@ async function renderConcertAttachmentsSection(concertId) {
       scheduleSync();
       renderResults();
     });
-    progRow.appendChild(viewBtn);
     progRow.appendChild(removeBtn);
   } else {
     const addBtn = document.createElement('button');
