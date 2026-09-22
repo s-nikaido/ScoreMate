@@ -68,13 +68,19 @@ self.addEventListener('fetch', (event) => {
 
   if (isSameOrigin) {
     // アプリ本体：オンライン時は常に最新を取得してキャッシュを更新し、
-    // 取得できない時（オフライン）はキャッシュを使う
+    // 取得できない時（オフライン）はキャッシュを使う。
+    // ネットには繋がったが正常なページでない場合（ホスティング側の障害・利用停止時の
+    // エラーページ等）は、その内容でキャッシュを上書きせず、既存の正常なキャッシュが
+    // あればそちらを優先する。
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const resClone = res.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(req, resClone));
-          return res;
+          if (res.ok) {
+            const resClone = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, resClone));
+            return res;
+          }
+          return caches.match(req).then((cached) => cached || res);
         })
         .catch(() =>
           caches.match(req).then((cached) => cached || caches.match('./index.html'))
