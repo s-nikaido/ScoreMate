@@ -826,7 +826,7 @@ function idbGetAll(name) { return new Promise((res, rej) => { const r = idbStore
 function idbGet(name, id) { return new Promise((res, rej) => { const r = idbStore(name).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 function idbPut(name, value) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').put(value); r.onsuccess = () => res(value); r.onerror = () => rej(r.error); }); }
 function idbDelete(name, id) { return new Promise((res, rej) => { const r = idbStore(name, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }); }
-const APP_VERSION = '1.4.0'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
+const APP_VERSION = '1.4.1'; // バージョン更新時はここだけ書き換える（ヘッダー・フッター・エクスポートmanifest等、全て連動）。あ.い.う：あ=指示があった時のみ変更／い=機能追加ごとに+1しうを0に／う=既存修正ごとに+1
 const FEEDBACK_EMAIL = 'scoremate.feedback@gmail.com';
 function genId() { return (crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2)); }
 function nowIso() { return new Date().toISOString(); }
@@ -1090,7 +1090,18 @@ async function startPlayerAt(index) {
       playerVars: { autoplay: 1, playsinline: 1 },
       events: {
         onReady: () => { if (ytPlayerReadyResolve) { ytPlayerReadyResolve(); ytPlayerReadyResolve = null; } },
-        onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) startPlayerAt(playQueueIndex + 1); },
+        onStateChange: (e) => {
+          if (e.data !== YT.PlayerState.ENDED) return;
+          // 広告が終わった瞬間にも一時的にENDEDが発火することがあるため、
+          // 少し待ってから本当に終了したまま（再生中に戻っていない）かを確認して次へ進む
+          const endedAtIndex = playQueueIndex;
+          setTimeout(() => {
+            if (playQueueIndex !== endedAtIndex) return; // 待っている間に操作で状況が変わっていたら何もしない
+            if (ytPlayer && ytPlayer.getPlayerState() === YT.PlayerState.ENDED) {
+              startPlayerAt(playQueueIndex + 1);
+            }
+          }, 1200);
+        },
       },
     });
   } else {
@@ -3880,9 +3891,46 @@ async function performSync({ forceWrite = false, manual = false } = {}) {
   }
 }
 
+// ================== ネイティブアプリ（WinUI3版）連携用ブリッジ ==================
+// WinUI3版アプリ内のWebView2で動いている場合、window.chrome.webview が存在する。
+// PWA（ブラウザ／Netlify）版ではこれは存在しないため、既存の動作には一切影響しない。
+//
+// GoogleもDropboxも、組み込みブラウザ（WebView2等）内でのOAuthサインインを許可しない／
+// 不安定なため、ネイティブアプリ側ではサインイン画面をOSの既定ブラウザで開き、
+// ローカルのループバック（http://127.0.0.1:port/）でリダイレクトを受け取る方式を
+// C#側（MainWindow.xaml.cs）で実装している。ここではその結果を受け取るだけ。
+const isNativeApp = !!(window.chrome && window.chrome.webview);
+let nativeOAuthRequestSeq = 0;
+const nativeOAuthPending = new Map();
+if (isNativeApp) {
+  window.chrome.webview.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || !data.requestId) return;
+    const pending = nativeOAuthPending.get(data.requestId);
+    if (!pending) return;
+    nativeOAuthPending.delete(data.requestId);
+    pending.resolve(data);
+  });
+}
+function nativeOAuthRequest(payload, timeoutMs = 180000) {
+  return new Promise((resolve) => {
+    const requestId = 'req' + (++nativeOAuthRequestSeq) + '-' + Date.now();
+    const timer = setTimeout(() => {
+      nativeOAuthPending.delete(requestId);
+      resolve({ success: false, error: 'timeout' });
+    }, timeoutMs);
+    nativeOAuthPending.set(requestId, {
+      resolve: (data) => { clearTimeout(timer); resolve(data); },
+    });
+    window.chrome.webview.postMessage({ ...payload, requestId });
+  });
+}
+
 // ================== Google Drive連携（PC向け・実験的） ==================
 // ---- 開発者向け設定：Google Cloud Consoleで作成したOAuthクライアントIDをここに設定してください ----
 // 参考: https://console.cloud.google.com/apis/credentials （種類：ウェブアプリケーション）
+// ※ネイティブアプリ（WinUI3）版は別のOAuthクライアント（種類：デスクトップ アプリ）を
+//   MainWindow.xaml.cs側で使用するため、この定数はPWA版でのみ使われる。
 const GOOGLE_DRIVE_CLIENT_ID = '394747709835-eteu9duk0qh5mv7q2dim3mdhr5ghttje.apps.googleusercontent.com';
 
 const DRIVE_FOLDER_NAME = 'ScoreMate';
@@ -3971,6 +4019,7 @@ function ensureDriveTokenClient() {
 }
 
 function requestDriveToken({ silent = false } = {}) {
+  if (isNativeApp) return requestDriveTokenNative(silent);
   const tokenPromise = new Promise((resolve) => {
     const client = ensureDriveTokenClient();
     if (!client) { resolve(false); return; }
@@ -3995,6 +4044,18 @@ function requestDriveToken({ silent = false } = {}) {
     }, timeoutMs);
   });
   return Promise.race([tokenPromise, timeoutPromise]);
+}
+
+// ネイティブアプリ版：C#側にトークン取得を依頼する（silent時はブラウザを開かず、
+// 有効なトークンが既にキャッシュ／リフレッシュトークンから即時取得できる場合のみ成功する）
+async function requestDriveTokenNative(silent) {
+  const result = await nativeOAuthRequest({ type: 'google-auth-start', silent: !!silent }, silent ? 15000 : 180000);
+  if (!result || !result.success) {
+    if (!silent) setDriveStatus(t('drive_connect_failed') + ((result && result.error) || ''));
+    return false;
+  }
+  driveAccessToken = result.accessToken;
+  return true;
 }
 
 async function driveApiFetch(url, options = {}) {
@@ -4441,14 +4502,14 @@ async function refreshDropboxAccessToken() {
   } catch (err) { console.error('dropbox token refresh failed', err); return false; }
 }
 
-async function exchangeDropboxCode(code, verifier) {
+async function exchangeDropboxCode(code, verifier, redirectUri = DROPBOX_REDIRECT_URI) {
   try {
     const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY,
-        redirect_uri: DROPBOX_REDIRECT_URI, code_verifier: verifier,
+        redirect_uri: redirectUri, code_verifier: verifier,
       }),
     });
     if (!res.ok) { const text = await res.text(); throw new Error(text.slice(0, 200)); }
@@ -4465,11 +4526,28 @@ async function exchangeDropboxCode(code, verifier) {
   }
 }
 
+// ネイティブアプリ版：OSの既定ブラウザでDropboxのサインイン画面を開き、
+// C#側のローカル待受サーバーでリダイレクト後のcodeを回収する
+async function dropboxNativeAuth(challenge, state, verifier) {
+  const result = await nativeOAuthRequest({
+    type: 'dropbox-auth-start',
+    appKey: DROPBOX_APP_KEY,
+    codeChallenge: challenge,
+    state,
+  });
+  if (!result || !result.success) {
+    setDropboxStatus(t('drive_connect_failed') + ((result && result.error) || ''));
+    return false;
+  }
+  return await exchangeDropboxCode(result.code, verifier, result.redirectUri);
+}
+
 // ポップアップでDropboxの認可画面を開き、リダイレクト後のcodeを回収する
 async function dropboxPopupAuth() {
   const verifier = randomPkceString(64);
   const challenge = await sha256Base64Url(verifier);
   const state = randomPkceString(24);
+  if (isNativeApp) return await dropboxNativeAuth(challenge, state, verifier);
   const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(DROPBOX_REDIRECT_URI)}&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=offline&state=${state}`;
   const popup = window.open(authUrl, 'dropbox-auth', 'width=500,height=650');
   if (!popup) { setDropboxStatus(t('alert_popup_blocked')); return false; }
